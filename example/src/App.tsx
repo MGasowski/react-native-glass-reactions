@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { TRIGGERS_ENABLED } from './ab-config';
 import {
   ReactionsPickerHost,
   ReactionTrigger,
@@ -97,7 +98,6 @@ function Row({
 
 export default function App() {
   const [scores, setScores] = useState<Record<number, ReactionId>>({});
-  const [triggersEnabled, setTriggersEnabled] = useState(true);
 
   const handleSelect = useCallback((index: number, id: ReactionId | null) => {
     setScores((previous) => {
@@ -116,18 +116,6 @@ export default function App() {
       {/* Required at the root. Renders nothing; installs the one recognizer. */}
       <ReactionsPickerHost />
 
-      <Pressable
-        style={styles.toggle}
-        testID={triggersEnabled ? 'triggers-on' : 'triggers-off'}
-        accessibilityRole="button"
-        accessibilityLabel={triggersEnabled ? 'triggers on' : 'triggers off'}
-        onPress={() => setTriggersEnabled((on) => !on)}
-      >
-        <Text style={styles.toggleText}>
-          triggers: {triggersEnabled ? 'on' : 'off'} (tap to toggle)
-        </Text>
-      </Pressable>
-
       <FlatList
         data={ROWS}
         keyExtractor={(item) => String(item)}
@@ -136,7 +124,7 @@ export default function App() {
             index={item}
             selected={scores[item]}
             onSelect={handleSelect}
-            triggersEnabled={triggersEnabled}
+            triggersEnabled={TRIGGERS_ENABLED}
           />
         )}
         contentInsetAdjustmentBehavior="automatic"
@@ -149,16 +137,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#101014',
-  },
-  toggle: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#1E1E25',
-  },
-  toggleText: {
-    color: '#8E8E98',
-    fontSize: 13,
-    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',
