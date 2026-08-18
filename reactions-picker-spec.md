@@ -164,6 +164,7 @@ The plugin is not merely a convenience: it must set `CADisableMinimumFrameDurati
 - Rounded corners + masking + blur triggers offscreen rendering. Verify with "Color Offscreen-Rendered Yellow" before release.
 - Glass rendering has regressed across iOS point releases historically. Pin a device/OS test matrix and re-verify each iOS minor.
 - Respect **Reduce Transparency** and **Reduce Motion** accessibility settings.
+- **Simulator runtimes can ship unable to render emoji at all** — every emoji draws as `.notdef`, through any API, including plain React Native `<Text>`. Observed on iOS 26.3.1 (23D8133); correct on 26.5 (23F77). Before debugging emoji rendering in this library, render the same string through RN `<Text>` as a control: if that is boxes too, the runtime is at fault and the native code is fine. Verify emoji on a known-good runtime or a device, never on a single simulator.
 
 ### 6.4 Gesture arbitration (hardest correctness problem)
 

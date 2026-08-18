@@ -239,16 +239,16 @@ private enum ReactionRasteriser {
     let side = Metrics.rasterSize
     let pointSize = side * 0.82
 
-    // Name the emoji font explicitly rather than relying on implicit fallback
-    // from the system font — fallback does not reliably kick in when drawing
-    // an attributed string into an offscreen image context, and the result is
-    // .notdef boxes instead of emoji.
-    let font =
-      UIFont(name: "AppleColorEmoji", size: pointSize)
-      ?? UIFont.systemFont(ofSize: pointSize)
-
-    let attributes: [NSAttributedString.Key: Any] = [.font: font]
-    let string = NSAttributedString(string: value, attributes: attributes)
+    // Rasterised by snapshotting a UILabel so drawing goes through exactly the
+    // path UIKit uses on screen — colour glyph handling and vertical centring
+    // come for free rather than being reimplemented with CoreText metrics.
+    // One-off per item: no text layout happens on open (spec §6.5).
+    let label = UILabel()
+    label.text = value
+    label.font = UIFont.systemFont(ofSize: pointSize)
+    label.textAlignment = .center
+    label.backgroundColor = .clear
+    label.frame = CGRect(x: 0, y: 0, width: side, height: side)
 
     let format = UIGraphicsImageRendererFormat.preferred()
     format.opaque = false
@@ -257,15 +257,8 @@ private enum ReactionRasteriser {
       size: CGSize(width: side, height: side),
       format: format
     )
-    return renderer.image { _ in
-      let bounds = string.boundingRect(
-        with: CGSize(width: side, height: side),
-        options: [.usesLineFragmentOrigin, .usesDeviceMetrics],
-        context: nil
-      )
-      string.draw(
-        at: CGPoint(x: (side - bounds.width) / 2, y: (side - bounds.height) / 2)
-      )
+    return renderer.image { context in
+      label.layer.render(in: context.cgContext)
     }
   }
 
