@@ -11,14 +11,14 @@
 
 A React Native view component that renders an Instagram-style reactions picker as a **fully native view**, implemented in Swift via Nitro Views on iOS and Kotlin on Android. The interaction (long-press → drag → select) and all animation run natively; JavaScript is involved only at mount and at selection.
 
-On iOS 26+ the picker is rendered with the system Liquid Glass material, using a glass container so adjacent reaction pills merge and separate as the picker expands. On older iOS and on Android, it degrades to a defined non-glass appearance.
+On iOS 26+ the picker is rendered with the system Liquid Glass material as a single capsule behind the reactions. On older iOS and on Android, it degrades to a defined non-glass appearance.
 
 Primary consumer use case: scoring reviews on a content platform, where the picker is attached to items inside a long virtualised list.
 
 ## 2. Goals
 
 - 120 fps interaction on the oldest supported device, with no JS thread involvement during the gesture.
-- Native iOS 26 Liquid Glass appearance, including glass union/separation on expand.
+- Native iOS 26 Liquid Glass appearance.
 - Correct gesture arbitration inside `FlatList` / `FlashList` / `ScrollView`.
 - Zero required peer dependencies beyond `react-native-nitro-modules`.
 - Clean degradation — never a crash, never a build failure, on unsupported OS versions.
@@ -36,9 +36,11 @@ Primary consumer use case: scoring reviews on a content platform, where the pick
 
 ### 4.1 Module type
 
-Nitro View (`HybridView<Props, Methods>`), chosen for direct Swift↔C++ interop without an Objective-C hop. This is a developer-experience decision, not a performance one — the JS↔native call cost is irrelevant at two calls per interaction.
+Nitro **HybridObject** (`ReactionsHost`), chosen for direct Swift↔C++ interop without an Objective-C hop. This is a developer-experience decision, not a performance one — the JS↔native call cost is irrelevant at two calls per interaction.
 
-**Hard requirements inherited from Nitro Views:** React Native 0.78+ and the New Architecture. Liquid Glass raises the practical floor to RN 0.80+.
+**Revised:** this originally specified a Nitro *View*. The library now ships no React view managers at all. Since the host presents one pooled native view into its own overlay and triggers are plain RN views the consumer already renders (§4.3, §6.5), a hybrid view had no remaining caller and was removed — which also removes it from the published artifact.
+
+**Hard requirements:** React Native 0.78+ and the New Architecture. Liquid Glass raises the practical floor to RN 0.80+.
 
 ### 4.2 Layer split
 
@@ -77,7 +79,13 @@ Two lifecycle details that are easy to get wrong and are correctness, not polish
 
 Decide the visual language **before** the props schema is finalised — retrofitting a second appearance model into an existing API is painful.
 
-Baseline: `RenderEffect` blur on API 31+, flat translucent surface below that. Spring animation via `SpringAnimation` (dynamic-animation). Haptics via `HapticFeedbackConstants`.
+Baseline: a flat translucent capsule with a hairline border, light/dark aware. Spring animation via `SpringAnimation` (dynamic-animation). Haptics via `HapticFeedbackConstants`.
+
+**Revised:** this originally specified a `RenderEffect` blur on API 31+. `View.setRenderEffect` blurs the view's *own* content, not what is painted behind it, so on a plain coloured backdrop it costs GPU time and renders nothing. Android has no true backdrop-blur primitive, so the fallback is an honest flat surface rather than an imitation of glass.
+
+Reduced motion is exposed as the system animator duration scale being zero, not as a dedicated flag — a different check from the iOS one.
+
+Material Symbols are deferred: `symbol.android` requires shipping the Material Symbols font in the AAR, so Android renders emoji only in 1.0. Since `emoji` is required on every item, this costs nothing at the call site.
 
 ## 5. Public API (draft)
 
@@ -293,16 +301,16 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 
 ## 9. Milestones
 
-| # | Milestone | Exit criteria |
-|---|---|---|
-| M0 | Scaffold | Nitro template builds on both platforms in CI |
-| M1 | Static glass view | Glass pill renders on iOS 26; plain view fallback elsewhere; no crash |
-| M2 | Host + gesture arbitration | Single-instance host, portal presentation, trigger registration, one host-owned recognizer; opens and selects correctly inside a scrolling FlashList on both platforms |
-| M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments |
-| M4 | Android parity | Defined fallback appearance and interaction shipped |
-| M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device |
-| M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates |
-| M7 | 1.0.0 | Published, provenance-signed, announcement written |
+| # | Milestone | Exit criteria | Status |
+|---|---|---|---|
+| M0 | Scaffold | Nitro template builds on both platforms in CI | **Done** — both example apps build locally; CI workflow present |
+| M1 | Static glass view | Glass pill renders on iOS 26; plain view fallback elsewhere; no crash | **Done** — verified on iOS 26.5 and Android |
+| M2 | Host + gesture arbitration | Single-instance host, portal presentation, trigger registration, one host-owned recognizer; opens and selects correctly inside a scrolling FlashList on both platforms | **Done** — verified on a 1000-row `FlatList` on both platforms; open, drag, select, deselect, and plain-scroll all correct. `FlashList` itself untested |
+| M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments | **Partial** — springs, stagger, focus, haptics and Reduce Motion shipped. **Instruments pass and the pooled-vs-deallocated measurement are outstanding and need a real device** |
+| M4 | Android parity | Defined fallback appearance and interaction shipped | **Done** — flat translucent capsule, light/dark aware, full interaction. Material Symbols deferred: emoji only on Android in 1.0 |
+| M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device | **Blocked on hardware** — the 1000-row example exists and scrolls correctly, but simulator numbers do not establish the gate. Needs a device |
+| M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates | **Partial** — config plugin, README + support matrix, SECURITY, CONTRIBUTING Nitrogen workflow, issue-template fields, and the glass-guard CI check are done. **E2E flow not written** |
+| M7 | 1.0.0 | Published, provenance-signed, announcement written | Not started — publishing is the owner's call |
 
 ## 10. Risks
 
