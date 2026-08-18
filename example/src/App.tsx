@@ -66,7 +66,16 @@ function Row({
         <Text style={styles.rowTitle}>Review #{index + 1}</Text>
         <Text style={styles.rowBody}>Long-press to score. Drag to choose.</Text>
       </View>
-      <View style={styles.badge}>
+      {/* testID maps to accessibilityIdentifier on iOS and the label carries
+          the current selection, so the on-device UI test can assert that a
+          selection actually round-tripped through JS rather than just that
+          the row still exists. */}
+      <View
+        style={styles.badge}
+        accessible
+        testID={`score-${index + 1}`}
+        accessibilityLabel={selected ?? 'none'}
+      >
         <Text style={styles.badgeText}>
           {selected ? EMOJI_BY_ID[selected] : '–'}
         </Text>

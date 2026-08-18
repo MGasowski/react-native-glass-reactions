@@ -155,3 +155,40 @@ For anything touching rendering or gestures, run the example app and use it — 
 Some iOS simulator runtimes cannot render emoji at all: every emoji draws as a missing-glyph box through any API, including plain React Native `<Text>`. This was observed on iOS 26.3.1 and is correct on 26.5.
 
 Before debugging emoji rendering in this library, render the same string through `<Text>` as a control. If that shows boxes too, the runtime is at fault and the native code is fine. Verify emoji on a known-good runtime or a real device, never on a single simulator.
+
+## Native UI tests (on-device)
+
+The core interaction cannot be covered by Maestro: `longPressOn` presses *and releases*, which ends the gesture before a reaction can be dragged to. The XCUITest suite in `example/ios/GlassReactionsExampleUITests` covers it with `press(forDuration:thenDragTo:)`, which is a single continuous press → hold → drag → release.
+
+The example project deliberately carries **no** `DEVELOPMENT_TEAM`, so pass your own:
+
+```sh
+cd example/ios
+xcodebuild test \
+  -workspace GlassReactionsExample.xcworkspace \
+  -scheme GlassReactionsExample \
+  -configuration Release \
+  -destination 'platform=iOS,id=<your-device-udid>' \
+  -allowProvisioningUpdates \
+  DEVELOPMENT_TEAM=<your-team-id>
+```
+
+Find the device UDID with `xcrun devicectl list devices`.
+
+Two things that will waste your time otherwise:
+
+- **The device must be unlocked.** XCUITest against a locked device hangs with no output rather than failing — it looks like a stuck build.
+- **Use `Release`.** A Debug build serves JS from Metro and keeps dev-mode assertions live, so any timing you take from it is meaningless.
+
+### Profiling
+
+`testSustainedScrollForProfiling` exists to give a profiler something to attach to. Record with:
+
+```sh
+xcrun xctrace record --device <udid> --template 'Animation Hitches' \
+  --attach <pid> --time-limit 60s --output hitches.trace
+```
+
+Attach by **PID**, not by process name — attaching by name fails and, unhelpfully, `xctrace` still exits 0 while producing no trace. Get the PID from `xcrun devicectl device info processes --device <udid> | grep GlassReactions`.
+
+An empty `hitches-frame-lifetimes` table means the app rendered nothing during the window, not that it rendered perfectly.

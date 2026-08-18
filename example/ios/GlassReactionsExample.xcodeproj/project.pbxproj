@@ -10,9 +10,21 @@
 		004A27BEC036FA8CE000453B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		0C80B921A6F3F58F76C31292 /* libPods-GlassReactionsExample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-GlassReactionsExample.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		544DCAEB514E517655087731 /* ReactionsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992A7366D9E8311F2896A6F1 /* ReactionsUITests.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A60D5036B0AA46934DFF681E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D81EE23DFD6726BBC1DAD86 /* Foundation.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A3D23613E4F1B7CE80715F9A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = GlassReactionsExample;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* GlassReactionsExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassReactionsExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -24,6 +36,9 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-GlassReactionsExample.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-GlassReactionsExample.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = GlassReactionsExample/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = GlassReactionsExample/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		992A7366D9E8311F2896A6F1 /* ReactionsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReactionsUITests.swift; sourceTree = "<group>"; };
+		9D81EE23DFD6726BBC1DAD86 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		AA98C15D6F3BE66D960F17B4 /* GlassReactionsExampleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassReactionsExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -33,6 +48,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-GlassReactionsExample.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		63267B46347BBDC1405E4399 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A60D5036B0AA46934DFF681E /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,8 +79,26 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-GlassReactionsExample.a */,
+				625995EC49D23DB8D243E003 /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4E4311B2811FAE19688BDB3F /* GlassReactionsExampleUITests */ = {
+			isa = PBXGroup;
+			children = (
+				992A7366D9E8311F2896A6F1 /* ReactionsUITests.swift */,
+			);
+			name = GlassReactionsExampleUITests;
+			path = GlassReactionsExampleUITests;
+			sourceTree = "<group>";
+		};
+		625995EC49D23DB8D243E003 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				9D81EE23DFD6726BBC1DAD86 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -75,6 +116,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				4E4311B2811FAE19688BDB3F /* GlassReactionsExampleUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -85,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* GlassReactionsExample.app */,
+				AA98C15D6F3BE66D960F17B4 /* GlassReactionsExampleUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -122,6 +165,24 @@
 			productReference = 13B07F961A680F5B00A75B9A /* GlassReactionsExample.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4475B55294DCB7B93E3FD6C2 /* GlassReactionsExampleUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC4A82EFA4CB9BE684DCBAA0 /* Build configuration list for PBXNativeTarget "GlassReactionsExampleUITests" */;
+			buildPhases = (
+				EAC1D8D284D848AF7921F91B /* Sources */,
+				63267B46347BBDC1405E4399 /* Frameworks */,
+				9440F133DC30E5A73125290A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2B2A6D7A72DEE230A154B52F /* PBXTargetDependency */,
+			);
+			name = GlassReactionsExampleUITests;
+			productName = GlassReactionsExampleUITests;
+			productReference = AA98C15D6F3BE66D960F17B4 /* GlassReactionsExampleUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -149,6 +210,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* GlassReactionsExample */,
+				4475B55294DCB7B93E3FD6C2 /* GlassReactionsExampleUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -161,6 +223,13 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				004A27BEC036FA8CE000453B /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9440F133DC30E5A73125290A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,15 +319,51 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EAC1D8D284D848AF7921F91B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				544DCAEB514E517655087731 /* ReactionsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		2B2A6D7A72DEE230A154B52F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = GlassReactionsExample;
+			target = 13B07F861A680F5B00A75B9A /* GlassReactionsExample */;
+			targetProxy = A3D23613E4F1B7CE80715F9A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		043967C39C2134B008A91D08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GlassReactionsExampleUITests;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = glassreactions.example.uitests;
+				PRODUCT_NAME = GlassReactionsExampleUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GlassReactionsExample;
+			};
+			name = Debug;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-GlassReactionsExample.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = GlassReactionsExample/Info.plist;
@@ -289,6 +394,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = GlassReactionsExample/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -467,6 +573,25 @@
 			};
 			name = Release;
 		};
+		95E8FE6CF52B55B16075952F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GlassReactionsExampleUITests;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = glassreactions.example.uitests;
+				PRODUCT_NAME = GlassReactionsExampleUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GlassReactionsExample;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -484,6 +609,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC4A82EFA4CB9BE684DCBAA0 /* Build configuration list for PBXNativeTarget "GlassReactionsExampleUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				95E8FE6CF52B55B16075952F /* Release */,
+				043967C39C2134B008A91D08 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
