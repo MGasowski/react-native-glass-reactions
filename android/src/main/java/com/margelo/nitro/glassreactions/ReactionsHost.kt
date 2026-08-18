@@ -269,26 +269,43 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         triggerView.parent?.requestDisallowInterceptTouchEvent(true)
 
         pill.applyItems(registration.items, registration.selectedId, renderMode)
-        pill.measure(0, 0)
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        pill.measure(unspecified, unspecified)
 
-        val size = pill.measuredWidth to pill.measuredHeight
+        val width = pill.measuredWidth
+        val height = pill.measuredHeight
+
         val location = IntArray(2)
         triggerView.getLocationOnScreen(location)
         val overlayLocation = IntArray(2)
         layer.getLocationOnScreen(overlayLocation)
 
-        val margin = (12 * activity.resources.displayMetrics.density).toInt()
-        var left = location[0] + triggerView.width / 2 - size.first / 2 - overlayLocation[0]
-        val top = (location[1] - overlayLocation[1] - size.second - margin).coerceAtLeast(margin)
-        left = left.coerceIn(margin, (layer.width - size.first - margin).coerceAtLeast(margin))
+        val metrics = activity.resources.displayMetrics
+        val margin = (12 * metrics.density).toInt()
+        // The overlay reports width 0 until it has been through a layout pass,
+        // which it has not on the first open. Clamping against that pins the
+        // picker to the left margin and — worse — puts the hit rectangle
+        // somewhere the finger never goes, so nothing is ever selected.
+        val available = if (layer.width > 0) layer.width else metrics.widthPixels
 
-        if (pill.parent == null) layer.addView(pill)
-        pill.layout(left, top, left + size.first, top + size.second)
+        val left = (location[0] + triggerView.width / 2 - width / 2 - overlayLocation[0])
+            .coerceIn(margin, (available - width - margin).coerceAtLeast(margin))
+        val top = (location[1] - overlayLocation[1] - height - margin).coerceAtLeast(margin)
+
+        // Explicit LayoutParams rather than a manual layout() call: FrameLayout
+        // re-lays its children out on its own pass, and without params the
+        // picker defaults to MATCH_PARENT and is stretched to fill the screen.
+        val params = FrameLayout.LayoutParams(width, height).apply {
+            leftMargin = left
+            topMargin = top
+        }
+        if (pill.parent == null) layer.addView(pill, params) else pill.layoutParams = params
+
         activeRect.set(
             left + overlayLocation[0],
             top + overlayLocation[1],
-            left + overlayLocation[0] + size.first,
-            top + overlayLocation[1] + size.second
+            left + overlayLocation[0] + width,
+            top + overlayLocation[1] + height
         )
 
         focusedIndex = null
