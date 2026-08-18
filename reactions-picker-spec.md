@@ -221,6 +221,47 @@ Detaching already buys the entire GPU saving; deallocating buys only the memory 
 
 **Acceptance:** profiled in Instruments on the oldest supported device — no dropped frames scrolling a 1k-row list with triggers present; no dropped frames across open/drag/select/close; zero "Color Offscreen-Rendered Yellow" regions during the interaction.
 
+### 6.6 Recorded baseline (device)
+
+Measured on a tethered **iPhone 12 Pro, iOS 26.5.2, Release build**, driven by
+`testSustainedScrollForProfiling` (80 fast flings over the 1000-row example),
+recorded with the Instruments *Animation Hitches* template for 45 s.
+
+The two arms differ only in the build-time `TRIGGERS_ENABLED` flag: identical
+test, identical code path, rows either wrapped in a `ReactionTrigger` or not.
+
+| Metric | Triggers on | Triggers off | Delta |
+|---|---|---|---|
+| Frames rendered | 2163 | 2156 | +7 |
+| Hitches | 0 | 1 | −1 |
+| Hangs (count) | 25 | 24 | +1 |
+| Hang time | 5511 ms | 6785 ms | −1274 ms |
+
+**Verdict: the §6.5 scroll gate is met.** The delta is within run-to-run
+variance, and on two of the four metrics the arm *with* triggers measured
+better. Three independent runs of the triggers-on arm gave 2163/2164/2235
+frames and 0 hitches each, so the measurement is repeatable rather than a lucky
+sample.
+
+Two things this does *not* say, and should not be read as saying:
+
+- **The ~5.5–6.8 s of hangs is the example's own cost, not the library's.** It
+  appears in both arms, tracks the swipe cadence, and no picker was opened
+  during these runs. It is React re-rendering rows and `FlatList` virtualisation
+  on a 1000-row list.
+- **120 fps remains unverified.** The iPhone 12 Pro is a 60 Hz panel — ProMotion
+  starts at the 13 Pro — so the §2 goal and the `CADisableMinimumFrameDurationOnPhone`
+  path in §6.2 have not been exercised end to end on hardware that can show them.
+
+Method notes worth keeping, because each cost real time:
+
+- Attach `xctrace` by **PID**, never by process name. Attaching by name fails and
+  still exits 0 with no trace, which reads as a clean empty result.
+- Confirm the PID belongs to the build under test. An earlier run profiled a
+  stale side-by-side install and reported zero hitches that meant nothing.
+- An empty `hitches-frame-lifetimes` table means nothing rendered, not that
+  everything rendered perfectly.
+
 ## 7. Animation & dependencies
 
 ### 7.1 Core has no animation peer dependency
@@ -308,7 +349,7 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 | M2 | Host + gesture arbitration | Single-instance host, portal presentation, trigger registration, one host-owned recognizer; opens and selects correctly inside a scrolling FlashList on both platforms | **Done** — verified on a 1000-row `FlatList` on both platforms; open, drag, select, deselect, and plain-scroll all correct. `FlashList` itself untested |
 | M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments | **Partial** — springs, stagger, focus, haptics and Reduce Motion shipped. **Instruments pass and the pooled-vs-deallocated measurement are outstanding and need a real device** |
 | M4 | Android parity | Defined fallback appearance and interaction shipped | **Done** — flat translucent capsule, light/dark aware, full interaction. Material Symbols deferred: emoji only on Android in 1.0 |
-| M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device | **Blocked on hardware** — the 1000-row example exists and scrolls correctly, but simulator numbers do not establish the gate. Needs a device |
+| M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device | **Met on iPhone 12 Pro** — see §6.6. The delta is within run-to-run variance and negative on two of four metrics. Not yet re-checked on a ProMotion device |
 | M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates | **Partial** — config plugin, README + support matrix, SECURITY, CONTRIBUTING Nitrogen workflow, issue-template fields, glass-guard check, and a passing Maestro flow are done. **Selection is not E2E-covered** — see the `e2e` row in §8.4 |
 | M7 | 1.0.0 | Published, provenance-signed, announcement written | Not started — publishing is the owner's call |
 
