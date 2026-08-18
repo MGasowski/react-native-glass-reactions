@@ -1,0 +1,23 @@
+{
+  "cxxNamespace": ["glassreactions"],
+  "ios": {
+    "iosModuleName": "GlassReactions"
+  },
+  "android": {
+    "androidNamespace": ["glassreactions"],
+    "androidCxxLibName": "glassreactions"
+  },
+  "autolinking": {
+    "GlassReactions": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridGlassReactions"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridGlassReactions"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
