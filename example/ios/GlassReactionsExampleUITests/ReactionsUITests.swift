@@ -78,16 +78,33 @@ final class ReactionsUITests: XCTestCase {
     )
   }
 
+  private func scrollHard() {
+    for _ in 0..<40 { app.swipeUp(velocity: .fast) }
+    for _ in 0..<40 { app.swipeDown(velocity: .fast) }
+  }
+
   /// Drives sustained scrolling so a profiler attached to the process has
   /// something meaningful to measure (spec §6.5 scroll gate).
   func testSustainedScrollForProfiling() throws {
     XCTAssertTrue(row(1).waitForExistence(timeout: 30))
+    scrollHard()
+  }
 
-    for _ in 0..<40 {
-      app.swipeUp(velocity: .fast)
-    }
-    for _ in 0..<40 {
-      app.swipeDown(velocity: .fast)
-    }
+  /// The control half of the §6.5 gate: the identical list and row content with
+  /// the triggers removed. Whatever appears in both runs is the list's own
+  /// cost, not the library's — which is the only way to read a hitch or hang
+  /// count as attributable.
+  func testSustainedScrollWithoutTriggers() throws {
+    XCTAssertTrue(row(1).waitForExistence(timeout: 30))
+
+    let toggle = app.buttons.matching(identifier: "toggle-triggers").firstMatch
+    XCTAssertTrue(toggle.waitForExistence(timeout: 10), "toggle not found")
+    toggle.tap()
+
+    let off = NSPredicate(format: "label == %@", "triggers off")
+    expectation(for: off, evaluatedWith: toggle)
+    waitForExpectations(timeout: 10)
+
+    scrollHard()
   }
 }
