@@ -1,0 +1,44 @@
+appId: glassreactions.example
+name: Reactions example — launch and scroll arbitration
+---
+# Scope note, so nobody mistakes this for coverage of the core interaction.
+#
+# Maestro cannot express press → hold → drag → release as one continuous
+# gesture: `longPressOn` presses *and releases*, which ends the interaction
+# before a reaction can be dragged to. Since the whole library is that one
+# gesture, the selection path is NOT covered here and needs a native UI test
+# (XCUITest / Espresso) driving raw touch events.
+#
+# What this flow does protect is the arbitration rule that spec §6.4 calls the
+# top support cost: an ordinary swipe must still scroll the list normally with
+# the host's recognizer installed. That is a real regression class — an earlier
+# revision cancelled the scroll view's pan too eagerly — and it is cheap to
+# catch here.
+
+- launchApp:
+    clearState: true
+
+# A debug build fetches and evaluates the JS bundle first, which is far slower
+# than the default assertion timeout. Row #1 is deliberately not asserted on:
+# it sits under the status bar and is filtered out of the hierarchy.
+- extendedWaitUntil:
+    visible: 'Review #5'
+    timeout: 120000
+
+- assertVisible: 'Review #6'
+
+# --- A plain swipe scrolls -------------------------------------------------
+- swipe:
+    start: 50%, 80%
+    end: 50%, 25%
+    duration: 400
+
+- assertVisible: 'Review #15'
+
+# --- And scrolls back ------------------------------------------------------
+- swipe:
+    start: 50%, 25%
+    end: 50%, 80%
+    duration: 400
+
+- assertVisible: 'Review #5'

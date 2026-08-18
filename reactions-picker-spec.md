@@ -280,7 +280,7 @@ TypeScript tests catch almost nothing in a native library. CI must **compile the
 | `lint` | ESLint, Prettier, tsc `--noEmit`, SwiftLint, ktlint |
 | `build-ios` | Build example on Xcode 26, min + latest supported RN |
 | `build-android` | Build example, min + latest supported RN |
-| `e2e` | Maestro flow: open picker, drag, select, dismiss |
+| `e2e` | Maestro flow: launch and scroll arbitration. **Maestro cannot express the core gesture** — `longPressOn` presses and releases, so press → hold → drag → release is not expressible. Selection needs a native UI test (XCUITest / Espresso) driving raw touch events |
 | `release` | Tag-triggered npm publish with provenance |
 
 Do not attempt a full RN version matrix. Pin a documented minimum and the latest, and support exactly those.
@@ -309,7 +309,7 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 | M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments | **Partial** — springs, stagger, focus, haptics and Reduce Motion shipped. **Instruments pass and the pooled-vs-deallocated measurement are outstanding and need a real device** |
 | M4 | Android parity | Defined fallback appearance and interaction shipped | **Done** — flat translucent capsule, light/dark aware, full interaction. Material Symbols deferred: emoji only on Android in 1.0 |
 | M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device | **Blocked on hardware** — the 1000-row example exists and scrolls correctly, but simulator numbers do not establish the gate. Needs a device |
-| M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates | **Partial** — config plugin, README + support matrix, SECURITY, CONTRIBUTING Nitrogen workflow, issue-template fields, and the glass-guard CI check are done. **E2E flow not written** |
+| M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates | **Partial** — config plugin, README + support matrix, SECURITY, CONTRIBUTING Nitrogen workflow, issue-template fields, glass-guard check, and a passing Maestro flow are done. **Selection is not E2E-covered** — see the `e2e` row in §8.4 |
 | M7 | 1.0.0 | Published, provenance-signed, announcement written | Not started — publishing is the owner's call |
 
 ## 10. Risks
