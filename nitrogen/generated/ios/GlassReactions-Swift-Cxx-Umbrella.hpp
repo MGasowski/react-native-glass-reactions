@@ -10,11 +10,19 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridGlassReactionsSpec` to properly resolve imports.
 namespace margelo::nitro::glassreactions { class HybridGlassReactionsSpec; }
+// Forward declaration of `NativeReactionItem` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
+// Forward declaration of `ReactionRenderMode` to properly resolve imports.
+namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
 // Include C++ defined types
 #include "HybridGlassReactionsSpec.hpp"
+#include "NativeReactionItem.hpp"
+#include "ReactionRenderMode.hpp"
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 
 // C++ helpers for Swift
 #include "GlassReactions-Swift-Cxx-Bridge.hpp"

@@ -12,9 +12,16 @@
 // Forward declaration of `HybridGlassReactionsSpec_cxx` to properly resolve imports.
 namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
 
+// Forward declaration of `NativeReactionItem` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
+// Forward declaration of `ReactionRenderMode` to properly resolve imports.
+namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
-
+#include "NativeReactionItem.hpp"
+#include <vector>
 #include <string>
+#include <optional>
+#include "ReactionRenderMode.hpp"
 
 #include "GlassReactions-Swift-Cxx-Umbrella.hpp"
 
@@ -62,12 +69,26 @@ namespace margelo::nitro::glassreactions {
 
   public:
     // Properties
-    inline std::string getColor() noexcept override {
-      auto __result = _swiftPart.getColor();
+    inline std::vector<NativeReactionItem> getItems() noexcept override {
+      auto __result = _swiftPart.getItems();
       return __result;
     }
-    inline void setColor(const std::string& color) noexcept override {
-      _swiftPart.setColor(color);
+    inline void setItems(const std::vector<NativeReactionItem>& items) noexcept override {
+      _swiftPart.setItems(items);
+    }
+    inline ReactionRenderMode getRenderMode() noexcept override {
+      auto __result = _swiftPart.getRenderMode();
+      return static_cast<ReactionRenderMode>(__result);
+    }
+    inline void setRenderMode(ReactionRenderMode renderMode) noexcept override {
+      _swiftPart.setRenderMode(static_cast<int>(renderMode));
+    }
+    inline std::optional<std::string> getSelectedId() noexcept override {
+      auto __result = _swiftPart.getSelectedId();
+      return __result;
+    }
+    inline void setSelectedId(const std::optional<std::string>& selectedId) noexcept override {
+      _swiftPart.setSelectedId(selectedId);
     }
 
   public:

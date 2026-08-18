@@ -31,7 +31,19 @@ abstract class HybridGlassReactionsSpec: HybridView() {
   @get:Keep
   @set:DoNotStrip
   @set:Keep
-  abstract var color: String
+  abstract var items: Array<NativeReactionItem>
+  
+  @get:DoNotStrip
+  @get:Keep
+  @set:DoNotStrip
+  @set:Keep
+  abstract var renderMode: ReactionRenderMode
+  
+  @get:DoNotStrip
+  @get:Keep
+  @set:DoNotStrip
+  @set:Keep
+  abstract var selectedId: String?
 
   // Methods
   

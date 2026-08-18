@@ -7,9 +7,18 @@
 
 #include "JHybridGlassReactionsSpec.hpp"
 
+// Forward declaration of `NativeReactionItem` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
+// Forward declaration of `ReactionRenderMode` to properly resolve imports.
+namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
-
+#include "NativeReactionItem.hpp"
+#include <vector>
+#include "JNativeReactionItem.hpp"
 #include <string>
+#include <optional>
+#include "ReactionRenderMode.hpp"
+#include "JReactionRenderMode.hpp"
 
 namespace margelo::nitro::glassreactions {
 
@@ -41,14 +50,50 @@ namespace margelo::nitro::glassreactions {
   }
 
   // Properties
-  std::string JHybridGlassReactionsSpec::getColor() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>()>("getColor");
+  std::vector<NativeReactionItem> JHybridGlassReactionsSpec::getItems() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JArrayClass<JNativeReactionItem>>()>("getItems");
     auto __result = method(_javaPart);
-    return __result->toStdString();
+    return [&](auto&& __input) {
+      size_t __size = __input->size();
+      std::vector<NativeReactionItem> __vector;
+      __vector.reserve(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        auto __element = __input->getElement(__i);
+        __vector.push_back(__element->toCpp());
+      }
+      return __vector;
+    }(__result);
   }
-  void JHybridGlassReactionsSpec::setColor(const std::string& color) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* color */)>("setColor");
-    method(_javaPart, jni::make_jstring(color));
+  void JHybridGlassReactionsSpec::setItems(const std::vector<NativeReactionItem>& items) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */)>("setItems");
+    method(_javaPart, [&](auto&& __input) {
+      size_t __size = __input.size();
+      jni::local_ref<jni::JArrayClass<JNativeReactionItem>> __array = jni::JArrayClass<JNativeReactionItem>::newArray(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        const auto& __element = __input[__i];
+        auto __elementJni = JNativeReactionItem::fromCpp(__element);
+        __array->setElement(__i, *__elementJni);
+      }
+      return __array;
+    }(items));
+  }
+  ReactionRenderMode JHybridGlassReactionsSpec::getRenderMode() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JReactionRenderMode>()>("getRenderMode");
+    auto __result = method(_javaPart);
+    return __result->toCpp();
+  }
+  void JHybridGlassReactionsSpec::setRenderMode(ReactionRenderMode renderMode) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JReactionRenderMode> /* renderMode */)>("setRenderMode");
+    method(_javaPart, JReactionRenderMode::fromCpp(renderMode));
+  }
+  std::optional<std::string> JHybridGlassReactionsSpec::getSelectedId() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>()>("getSelectedId");
+    auto __result = method(_javaPart);
+    return __result != nullptr ? std::make_optional(__result->toStdString()) : std::nullopt;
+  }
+  void JHybridGlassReactionsSpec::setSelectedId(const std::optional<std::string>& selectedId) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* selectedId */)>("setSelectedId");
+    method(_javaPart, selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr);
   }
 
   // Methods

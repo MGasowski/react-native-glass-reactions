@@ -14,8 +14,12 @@ namespace margelo::nitro::glassreactions {
     HybridObject::loadHybridMethods();
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
-      prototype.registerHybridGetter("color", &HybridGlassReactionsSpec::getColor);
-      prototype.registerHybridSetter("color", &HybridGlassReactionsSpec::setColor);
+      prototype.registerHybridGetter("items", &HybridGlassReactionsSpec::getItems);
+      prototype.registerHybridSetter("items", &HybridGlassReactionsSpec::setItems);
+      prototype.registerHybridGetter("renderMode", &HybridGlassReactionsSpec::getRenderMode);
+      prototype.registerHybridSetter("renderMode", &HybridGlassReactionsSpec::setRenderMode);
+      prototype.registerHybridGetter("selectedId", &HybridGlassReactionsSpec::getSelectedId);
+      prototype.registerHybridSetter("selectedId", &HybridGlassReactionsSpec::setSelectedId);
     });
   }
 

@@ -26,14 +26,34 @@ namespace margelo::nitro::glassreactions::views {
                                                        const HybridGlassReactionsProps& sourceProps,
                                                        const react::RawProps& rawProps):
     react::ViewProps(context, sourceProps, rawProps, filterObjectKeys),
-    color([&]() -> CachedProp<std::string> {
+    items([&]() -> CachedProp<std::vector<NativeReactionItem>> {
       try {
-        const react::RawValue* rawValue = rawProps.at("color", nullptr, nullptr);
-        if (rawValue == nullptr) return sourceProps.color;
+        const react::RawValue* rawValue = rawProps.at("items", nullptr, nullptr);
+        if (rawValue == nullptr) return sourceProps.items;
         const auto& [runtime, value] = (std::pair<jsi::Runtime*, jsi::Value>)*rawValue;
-        return CachedProp<std::string>::fromRawValue(*runtime, value, sourceProps.color);
+        return CachedProp<std::vector<NativeReactionItem>>::fromRawValue(*runtime, value, sourceProps.items);
       } catch (const std::exception& exc) {
-        throw std::runtime_error(std::string("GlassReactions.color: ") + exc.what());
+        throw std::runtime_error(std::string("GlassReactions.items: ") + exc.what());
+      }
+    }()),
+    renderMode([&]() -> CachedProp<ReactionRenderMode> {
+      try {
+        const react::RawValue* rawValue = rawProps.at("renderMode", nullptr, nullptr);
+        if (rawValue == nullptr) return sourceProps.renderMode;
+        const auto& [runtime, value] = (std::pair<jsi::Runtime*, jsi::Value>)*rawValue;
+        return CachedProp<ReactionRenderMode>::fromRawValue(*runtime, value, sourceProps.renderMode);
+      } catch (const std::exception& exc) {
+        throw std::runtime_error(std::string("GlassReactions.renderMode: ") + exc.what());
+      }
+    }()),
+    selectedId([&]() -> CachedProp<std::optional<std::string>> {
+      try {
+        const react::RawValue* rawValue = rawProps.at("selectedId", nullptr, nullptr);
+        if (rawValue == nullptr) return sourceProps.selectedId;
+        const auto& [runtime, value] = (std::pair<jsi::Runtime*, jsi::Value>)*rawValue;
+        return CachedProp<std::optional<std::string>>::fromRawValue(*runtime, value, sourceProps.selectedId);
+      } catch (const std::exception& exc) {
+        throw std::runtime_error(std::string("GlassReactions.selectedId: ") + exc.what());
       }
     }()),
     hybridRef([&]() -> CachedProp<std::optional<std::function<void(const std::shared_ptr<HybridGlassReactionsSpec>& /* ref */)>>> {
@@ -49,7 +69,9 @@ namespace margelo::nitro::glassreactions::views {
 
   bool HybridGlassReactionsProps::filterObjectKeys(const std::string& propName) {
     switch (hashString(propName)) {
-      case hashString("color"): return true;
+      case hashString("items"): return true;
+      case hashString("renderMode"): return true;
+      case hashString("selectedId"): return true;
       case hashString("hybridRef"): return true;
       default: return false;
     }

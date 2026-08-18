@@ -13,9 +13,16 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `NativeReactionItem` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
+// Forward declaration of `ReactionRenderMode` to properly resolve imports.
+namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
-
+#include "NativeReactionItem.hpp"
+#include <vector>
+#include "ReactionRenderMode.hpp"
 #include <string>
+#include <optional>
 
 namespace margelo::nitro::glassreactions {
 
@@ -44,8 +51,12 @@ namespace margelo::nitro::glassreactions {
 
     public:
       // Properties
-      virtual std::string getColor() = 0;
-      virtual void setColor(const std::string& color) = 0;
+      virtual std::vector<NativeReactionItem> getItems() = 0;
+      virtual void setItems(const std::vector<NativeReactionItem>& items) = 0;
+      virtual ReactionRenderMode getRenderMode() = 0;
+      virtual void setRenderMode(ReactionRenderMode renderMode) = 0;
+      virtual std::optional<std::string> getSelectedId() = 0;
+      virtual void setSelectedId(const std::optional<std::string>& selectedId) = 0;
 
     public:
       // Methods

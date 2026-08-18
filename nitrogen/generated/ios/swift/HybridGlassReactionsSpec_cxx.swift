@@ -121,14 +121,55 @@ open class HybridGlassReactionsSpec_cxx {
   }
 
   // Properties
-  public final var color: std.string {
+  public final var items: bridge.std__vector_NativeReactionItem_ {
     @inline(__always)
     get {
-      return std.string(self.__implementation.color)
+      return { () -> bridge.std__vector_NativeReactionItem_ in
+        var __vector = bridge.create_std__vector_NativeReactionItem_(self.__implementation.items.count)
+        for __item in self.__implementation.items {
+          __vector.push_back(__item)
+        }
+        return __vector
+      }()
     }
     @inline(__always)
     set {
-      self.__implementation.color = String(newValue)
+      self.__implementation.items = newValue.map({ __item in __item })
+    }
+  }
+  
+  public final var renderMode: Int32 {
+    @inline(__always)
+    get {
+      return self.__implementation.renderMode.rawValue
+    }
+    @inline(__always)
+    set {
+      self.__implementation.renderMode = margelo.nitro.glassreactions.ReactionRenderMode(rawValue: newValue)!
+    }
+  }
+  
+  public final var selectedId: bridge.std__optional_std__string_ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_std__string_ in
+        if let __unwrappedValue = self.__implementation.selectedId {
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+        } else {
+          return .init()
+        }
+      }()
+    }
+    @inline(__always)
+    set {
+      self.__implementation.selectedId = { () -> String? in
+        if bridge.has_value_std__optional_std__string_(newValue) {
+          let __unwrapped = bridge.get_std__optional_std__string_(newValue)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }()
     }
   }
 

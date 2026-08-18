@@ -37,9 +37,17 @@ void JHybridGlassReactionsStateUpdater::updateViewProps(jni::alias_ref<jni::JCla
   }
 
   // Update all props if they are dirty
-  if (props->color.isDirty) {
-    hybridView->setColor(props->color.value);
-    props->color.isDirty = false;
+  if (props->items.isDirty) {
+    hybridView->setItems(props->items.value);
+    props->items.isDirty = false;
+  }
+  if (props->renderMode.isDirty) {
+    hybridView->setRenderMode(props->renderMode.value);
+    props->renderMode.isDirty = false;
+  }
+  if (props->selectedId.isDirty) {
+    hybridView->setSelectedId(props->selectedId.value);
+    props->selectedId.isDirty = false;
   }
 
   // Update hybridRef if it changed

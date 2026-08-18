@@ -79,10 +79,20 @@ using namespace margelo::nitro::glassreactions::views;
   // 2. Update each prop individually
   swiftPart.beforeUpdate();
 
-  // color: string
-  if (newViewProps.color.isDirty) {
-    swiftPart.setColor(newViewProps.color.value);
-    newViewProps.color.isDirty = false;
+  // items: array
+  if (newViewProps.items.isDirty) {
+    swiftPart.setItems(newViewProps.items.value);
+    newViewProps.items.isDirty = false;
+  }
+  // renderMode: enum
+  if (newViewProps.renderMode.isDirty) {
+    swiftPart.setRenderMode(static_cast<int>(newViewProps.renderMode.value));
+    newViewProps.renderMode.isDirty = false;
+  }
+  // selectedId: optional
+  if (newViewProps.selectedId.isDirty) {
+    swiftPart.setSelectedId(newViewProps.selectedId.value);
+    newViewProps.selectedId.isDirty = false;
   }
 
   swiftPart.afterUpdate();

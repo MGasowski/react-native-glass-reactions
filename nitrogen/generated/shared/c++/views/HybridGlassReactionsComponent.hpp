@@ -16,11 +16,14 @@
 #include <react/renderer/components/view/ConcreteViewShadowNode.h>
 #include <react/renderer/components/view/ViewProps.h>
 
+#include "NativeReactionItem.hpp"
+#include <vector>
+#include "ReactionRenderMode.hpp"
 #include <string>
+#include <optional>
 #include <memory>
 #include "HybridGlassReactionsSpec.hpp"
 #include <functional>
-#include <optional>
 
 namespace margelo::nitro::glassreactions::views {
 
@@ -42,7 +45,9 @@ namespace margelo::nitro::glassreactions::views {
                               const react::RawProps& rawProps);
 
   public:
-    CachedProp<std::string> color;
+    CachedProp<std::vector<NativeReactionItem>> items;
+    CachedProp<ReactionRenderMode> renderMode;
+    CachedProp<std::optional<std::string>> selectedId;
     CachedProp<std::optional<std::function<void(const std::shared_ptr<HybridGlassReactionsSpec>& /* ref */)>>> hybridRef;
 
   private:

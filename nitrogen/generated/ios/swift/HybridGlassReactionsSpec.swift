@@ -10,7 +10,9 @@ import NitroModules
 /// See ``HybridGlassReactionsSpec``
 public protocol HybridGlassReactionsSpec_protocol: HybridObject, HybridView {
   // Properties
-  var color: String { get set }
+  var items: [NativeReactionItem] { get set }
+  var renderMode: ReactionRenderMode { get set }
+  var selectedId: String? { get set }
 
   // Methods
   

@@ -50,8 +50,12 @@ namespace margelo::nitro::glassreactions {
 
   public:
     // Properties
-    std::string getColor() override;
-    void setColor(const std::string& color) override;
+    std::vector<NativeReactionItem> getItems() override;
+    void setItems(const std::vector<NativeReactionItem>& items) override;
+    ReactionRenderMode getRenderMode() override;
+    void setRenderMode(ReactionRenderMode renderMode) override;
+    std::optional<std::string> getSelectedId() override;
+    void setSelectedId(const std::optional<std::string>& selectedId) override;
 
   public:
     // Methods

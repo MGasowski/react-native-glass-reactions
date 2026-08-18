@@ -4,7 +4,9 @@
   "bubblingEventTypes": {},
   "directEventTypes": {},
   "validAttributes": {
-    "color": true,
+    "items": true,
+    "renderMode": true,
+    "selectedId": true,
     "hybridRef": true
   }
 }

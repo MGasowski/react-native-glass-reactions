@@ -10,6 +10,8 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridGlassReactionsSpec` to properly resolve imports.
 namespace margelo::nitro::glassreactions { class HybridGlassReactionsSpec; }
+// Forward declaration of `NativeReactionItem` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridGlassReactionsSpec_cxx` to properly resolve imports.
@@ -17,7 +19,11 @@ namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
 
 // Include C++ defined types
 #include "HybridGlassReactionsSpec.hpp"
+#include "NativeReactionItem.hpp"
 #include <memory>
+#include <optional>
+#include <string>
+#include <vector>
 
 /**
  * Contains specialized versions of C++ templated types so they can be accessed from Swift,
@@ -25,6 +31,32 @@ namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
  */
 namespace margelo::nitro::glassreactions::bridge::swift {
 
+  // pragma MARK: std::optional<std::string>
+  /**
+   * Specialized version of `std::optional<std::string>`.
+   */
+  using std__optional_std__string_ = std::optional<std::string>;
+  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
+    return std::optional<std::string>(value);
+  }
+  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::vector<NativeReactionItem>
+  /**
+   * Specialized version of `std::vector<NativeReactionItem>`.
+   */
+  using std__vector_NativeReactionItem_ = std::vector<NativeReactionItem>;
+  inline std::vector<NativeReactionItem> create_std__vector_NativeReactionItem_(size_t size) noexcept {
+    std::vector<NativeReactionItem> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
   // pragma MARK: std::shared_ptr<HybridGlassReactionsSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridGlassReactionsSpec>`.
