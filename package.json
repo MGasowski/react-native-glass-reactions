@@ -41,11 +41,12 @@
     "prepare": "bob build && yarn build:plugin",
     "nitrogen": "nitrogen",
     "typecheck": "tsc && tsc --noEmit -p plugin",
-    "lint": "eslint \"**/*.{js,ts,tsx}\" && yarn check:glass-guards",
+    "lint": "eslint \"**/*.{js,ts,tsx}\" && yarn check:glass-guards && yarn check:plugin",
     "build:plugin": "tsc --build plugin",
     "check:glass-guards": "node scripts/check-glass-guards.mjs",
     "ab:control": "sed -i '' 's/TRIGGERS_ENABLED = true/TRIGGERS_ENABLED = false/' example/src/ab-config.ts",
-    "ab:restore": "sed -i '' 's/TRIGGERS_ENABLED = false/TRIGGERS_ENABLED = true/' example/src/ab-config.ts"
+    "ab:restore": "sed -i '' 's/TRIGGERS_ENABLED = false/TRIGGERS_ENABLED = true/' example/src/ab-config.ts",
+    "check:plugin": "yarn build:plugin && node scripts/check-plugin.mjs"
   },
   "keywords": [
     "react-native",
