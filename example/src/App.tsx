@@ -118,7 +118,7 @@ export default function App() {
 
       <Pressable
         style={styles.toggle}
-        testID="toggle-triggers"
+        testID={triggersEnabled ? 'triggers-on' : 'triggers-off'}
         accessibilityRole="button"
         accessibilityLabel={triggersEnabled ? 'triggers on' : 'triggers off'}
         onPress={() => setTriggersEnabled((on) => !on)}

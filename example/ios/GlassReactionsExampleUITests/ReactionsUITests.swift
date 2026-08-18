@@ -97,13 +97,18 @@ final class ReactionsUITests: XCTestCase {
   func testSustainedScrollWithoutTriggers() throws {
     XCTAssertTrue(row(1).waitForExistence(timeout: 30))
 
-    let toggle = app.buttons.matching(identifier: "toggle-triggers").firstMatch
-    XCTAssertTrue(toggle.waitForExistence(timeout: 10), "toggle not found")
-    toggle.tap()
+    // The identifier encodes the state rather than the label: React Native
+    // merges an accessible Pressable's subtree, and a label change on the
+    // container does not reliably surface to XCUITest. An identifier swap does.
+    let on = app.buttons.matching(identifier: "triggers-on").firstMatch
+    XCTAssertTrue(on.waitForExistence(timeout: 15), "toggle not found")
+    on.tap()
 
-    let off = NSPredicate(format: "label == %@", "triggers off")
-    expectation(for: off, evaluatedWith: toggle)
-    waitForExpectations(timeout: 10)
+    let off = app.buttons.matching(identifier: "triggers-off").firstMatch
+    XCTAssertTrue(
+      off.waitForExistence(timeout: 15),
+      "toggle did not switch triggers off"
+    )
 
     scrollHard()
   }
