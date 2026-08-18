@@ -114,3 +114,44 @@ When you're sending a pull request:
 - Review the documentation to make sure it looks good.
 - Follow the pull request template when opening a pull request.
 - For pull requests that change the API or implementation, discuss with maintainers first by opening an issue.
+
+## Regenerating the Nitro bindings
+
+The generated bindings in `nitrogen/generated` are **committed to the repository on purpose**. Consumers must never run the code generator — that is the difference between a package that installs cleanly and a weekly stream of "build fails" issues.
+
+Any change to a `src/*.nitro.ts` spec means regenerating and committing the result:
+
+```sh
+yarn nitrogen
+```
+
+Then sync the native projects, because Nitrogen adds and removes files the build systems need to know about:
+
+```sh
+cd example/ios && pod install
+```
+
+Gradle picks the Android side up on the next build.
+
+Review the diff under `nitrogen/generated` before committing. If it is empty after a spec change, the generator did not pick your change up — check that the hybrid object is listed in `nitro.json` under `autolinking`, or it will generate a spec that nothing implements.
+
+Kotlin sources live under the `com.margelo` namespace. That is required by Nitro and appears in the published Android artifact. It is accepted, not a mistake.
+
+## Verifying a change
+
+TypeScript tests catch very little in a native library, so the meaningful checks are the builds:
+
+```sh
+yarn typecheck
+yarn lint
+yarn example ios
+yarn example android
+```
+
+For anything touching rendering or gestures, run the example app and use it — a green build proves almost nothing here.
+
+### Testing emoji rendering
+
+Some iOS simulator runtimes cannot render emoji at all: every emoji draws as a missing-glyph box through any API, including plain React Native `<Text>`. This was observed on iOS 26.3.1 and is correct on 26.5.
+
+Before debugging emoji rendering in this library, render the same string through `<Text>` as a control. If that shows boxes too, the runtime is at fault and the native code is fine. Verify emoji on a known-good runtime or a real device, never on a single simulator.

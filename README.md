@@ -1,39 +1,117 @@
 # react-native-glass-reactions
 
-Native Instagram-style reactions picker with iOS 26 Liquid Glass
+An Instagram-style reactions picker rendered as a **fully native view** — Swift on iOS, Kotlin on Android. The long-press, drag and select interaction and every animation run natively. JavaScript is involved twice per interaction: once at mount, once at selection.
 
-## Installation
+On iOS 26 the picker is drawn with the system **Liquid Glass** material. On older iOS and on Android it degrades to a defined flat surface. It never crashes and never fails a build on an unsupported OS.
 
+> **Requirements — read before installing.**
+> **Xcode 26+** is required to build the iOS side. A consumer on an older Xcode gets a *compile failure*, not a graceful degrade.
+> Also required: **React Native 0.80+**, the **New Architecture**, and `react-native-nitro-modules`.
+> **Not supported in Expo Go** — you need a development build.
 
-```sh
+## Install
+
+```bash
 npm install react-native-glass-reactions react-native-nitro-modules
-
-> `react-native-nitro-modules` is required as this library relies on [Nitro Modules](https://nitro.margelo.com/).
 ```
 
+Expo projects must add the config plugin. It is not optional decoration: iOS caps animation at 60 fps on ProMotion iPhones unless `CADisableMinimumFrameDurationOnPhone` is set, which puts the 120 fps target out of reach.
+
+```json
+{
+  "expo": {
+    "plugins": ["react-native-glass-reactions"]
+  }
+}
+```
+
+Bare projects should set that key in `Info.plist` themselves.
 
 ## Usage
 
+Mount the host once near the root of your app, then wrap anything you want to be long-pressable.
 
-```js
-import { GlassReactionsView } from "react-native-glass-reactions";
+```tsx
+import {
+  ReactionsPickerHost,
+  ReactionTrigger,
+  type ReactionItem,
+} from 'react-native-glass-reactions';
 
-// ...
+const REACTIONS: readonly ReactionItem[] = [
+  { id: 'like', emoji: '👍', symbol: { ios: 'hand.thumbsup.fill' }, accessibilityLabel: 'Like' },
+  { id: 'love', emoji: '❤️', symbol: { ios: 'heart.fill' }, accessibilityLabel: 'Love' },
+  { id: 'fire', emoji: '🔥', symbol: { ios: 'flame.fill' }, accessibilityLabel: 'Fire' },
+];
 
-<GlassReactionsView color="tomato" />
+function App() {
+  const [score, setScore] = useState<string | null>(null);
+
+  return (
+    <>
+      <ReactionsPickerHost />
+
+      <ReactionTrigger items={REACTIONS} selected={score ?? undefined} onSelect={setScore}>
+        <YourRow />
+      </ReactionTrigger>
+    </>
+  );
+}
 ```
 
+`ReactionTrigger` renders no appearance of its own — it wraps your children and nothing else. Showing the selected reaction afterwards is your job, from the `selected` value you already own.
 
-## Contributing
+## How it is built
 
-- [Development workflow](CONTRIBUTING.md#development-workflow)
-- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
-- [Code of conduct](CODE_OF_CONDUCT.md)
+One picker exists at a time, process-wide, and only while a gesture is in flight. It is not mounted per row.
+
+That is the load-bearing decision in the library. A trigger constructs no native view and no gesture recognizer; it registers the tag of the plain `View` it was already rendering. The host owns a single recognizer and resolves the live trigger view at gesture-begin, so no frames are cached in JavaScript and scrolling a long list costs exactly what it costs without the library.
+
+## Reaction content
+
+Every item **must** carry an `emoji`. A `symbol` is optional and preferred where it resolves.
+
+Symbols and emoji are not derivable from one another — nothing can produce 🔥 from `flame.fill` — so a fallback only exists if the item carries it. Requiring `emoji` is what makes `renderMode` a safe global kill switch rather than a setting that can blank the picker.
+
+| Platform | Preferred | Falls back to |
+| --- | --- | --- |
+| iOS | `symbol.ios` (SF Symbol), if it resolves | `emoji` |
+| Android | `symbol.android` (Material Symbol), if provided | `emoji` |
+
+SF Symbols are licensed for Apple platforms and cannot ship in an Android artifact, which is why `symbol` is per-platform rather than a single name. Omit `symbol.android` and you get emoji there with no extra work.
+
+Set `renderMode="emoji"` on the host to force emoji everywhere.
+
+## Selection model
+
+One reaction per user per item — upsert, not additive. Picking a different reaction replaces the current one; picking the reaction that is already selected clears it and emits `null`.
+
+## API
+
+| Export | What it is |
+| --- | --- |
+| `ReactionsPickerHost` | Required once at the root. Renders nothing. |
+| `ReactionTrigger` | Per-item wrapper around your own children. |
+| `isLiquidGlassSupported` | Runtime capability flag, backed by the native check. |
+
+## Support matrix
+
+| Library | React Native | Nitro | Min Xcode | Min iOS | Min Android |
+| --- | --- | --- | --- | --- | --- |
+| 0.1.x | 0.80 – 0.85 | 0.36.x | 26 | 15 (glass on 26+) | API 24 |
+
+The `react-native-nitro-modules` peer range has a pinned floor **and** ceiling. Nitro is pre-1.0 and ships often; expect releases here when it moves.
+
+## Accessibility
+
+Reactions are exposed as buttons with their `accessibilityLabel`. **Reduce Transparency** replaces glass with an opaque surface, and **Reduce Motion** replaces every spring with a plain fade.
+
+## Known platform traps
+
+- Never fade the picker with `opacity` from JavaScript. Setting `opacity: 0` on a glass view **or any ancestor** disables the effect outright.
+- Glass rendering has regressed across iOS point releases before. Re-verify on each iOS minor.
+- Some iOS simulator runtimes cannot render emoji at all — every emoji draws as a missing-glyph box through any API, including plain RN `<Text>`. Observed on iOS 26.3.1, correct on 26.5. Render an emoji through `<Text>` as a control before assuming the library is at fault.
 
 ## License
 
 MIT
-
----
-
-Made with [create-react-native-library](https://github.com/callstack/react-native-builder-bob)

@@ -85,3 +85,6 @@ android/generated
 # React Native Nitro Modules
 # nitrogen/ is intentionally NOT ignored — the generated bindings are committed so
 # consumers never run the code generator. See spec §8.2.
+
+# config plugin build output
+plugin/build/

@@ -308,7 +308,7 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Xcode < 26 breaks consumer builds | Critical — unusable for many | Compiler guards; documented requirement; CI proves old-toolchain build |
+| Xcode < 26 breaks consumer builds | Critical — unusable for many | Compiler guards; documented requirement; CI asserts guard placement via `yarn check:glass-guards` — **not** a full old-toolchain build, which React Native's own pinned toolchain makes impractical |
 | Glass regressions across iOS minors | High | Device/OS test matrix; re-verify each iOS release |
 | Gesture conflicts inside lists | High — top support cost | Build first; E2E coverage; explicit RNGH interop test |
 | Per-row cost degrades host app scroll | Critical — the failure consumers actually notice | §6.5: nothing native per row, no JS on the scroll path, ref-backed registration; Instruments gate on a 1k-row list |

@@ -1,13 +1,14 @@
-import { Platform } from 'react-native';
+import { host } from './host';
 
 /**
- * Whether Liquid Glass is expected to render on this device.
+ * Whether Liquid Glass will actually render on this device.
  *
- * NOTE (M1): this mirrors the OS-version half of the native gate but not the
- * runtime API-presence check in `GlassSupport.isAvailable` (spec §6.1), and it
- * does not account for Reduce Transparency. The native side is authoritative
- * and degrades on its own; treat this as a hint for consumer-side copy, not as
- * a guarantee. It will be backed by the native check before 1.0.
+ * Backed by the native check, which is the authoritative one: it requires the
+ * iOS 26 SDK at build time *and* the API being present at runtime, since some
+ * iOS 26 builds shipped without it (spec §6.1). Always false on Android.
+ *
+ * Note this reports device capability, not what the picker is doing right now —
+ * Reduce Transparency suppresses glass at presentation time without changing
+ * this value (spec §6.3).
  */
-export const isLiquidGlassSupported: boolean =
-  Platform.OS === 'ios' && Number.parseInt(String(Platform.Version), 10) >= 26;
+export const isLiquidGlassSupported: boolean = host.isLiquidGlassSupported;

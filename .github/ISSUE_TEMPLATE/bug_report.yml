@@ -65,3 +65,60 @@ body:
       description: Please provide a link to a repository on GitHub with a reproducible example.
     validations:
       required: true
+  - type: input
+    id: react-native-version
+    attributes:
+      label: React Native version
+      description: Exact version, e.g. 0.81.4.
+    validations:
+      required: true
+  - type: input
+    id: nitro-version
+    attributes:
+      label: react-native-nitro-modules version
+      description: Exact version. Nitro is pre-1.0 and ships often — this matters.
+    validations:
+      required: true
+  - type: input
+    id: xcode-version
+    attributes:
+      label: Xcode version
+      description: |
+        Xcode 26+ is required. Anything older is a compile failure, not a bug.
+        Put "n/a" for Android-only reports.
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: iOS / Android version
+      description: |
+        Exact OS build if you can. Glass rendering has regressed across iOS point
+        releases before, so the minor version is load-bearing.
+    validations:
+      required: true
+  - type: dropdown
+    id: new-architecture
+    attributes:
+      label: New Architecture enabled?
+      description: This library requires it. Reports with it disabled will be closed.
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+  - type: dropdown
+    id: emoji-control
+    attributes:
+      label: For emoji rendering issues — does a plain RN `<Text>` show the same emoji correctly?
+      description: |
+        Some simulator runtimes cannot render emoji at all, through any API. If
+        `<Text>` shows a missing-glyph box too, the runtime is at fault, not this
+        library. Leave as "n/a" if unrelated.
+      options:
+        - "n/a — not an emoji issue"
+        - "Yes, <Text> renders emoji fine"
+        - "No, <Text> shows boxes too"
+    validations:
+      required: false
