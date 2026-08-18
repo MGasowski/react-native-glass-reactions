@@ -3,11 +3,9 @@ package com.margelo.nitro.glassreactions
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.content.res.Configuration
 import android.graphics.Paint
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -61,17 +59,39 @@ private class ReactionsPillView(context: ThemedReactContext) : ViewGroup(context
             TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics
         ).toInt()
 
+    /**
+     * A single opaque-ish capsule behind the whole row, matching the one-container
+     * look on iOS.
+     *
+     * Deliberately not a RenderEffect blur: `View.setRenderEffect` blurs the
+     * view's *own* content, not what is painted behind it, so applying it to a
+     * plain coloured backdrop costs GPU time and changes nothing visible. Android
+     * has no true backdrop-blur primitive, so the defined fallback (spec §4.5) is
+     * a flat translucent surface rather than an imitation of glass.
+     */
     private fun applyBackdrop() {
-        backdrop.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.argb(0x2E, 0x80, 0x80, 0x80))
+        val night = (context.resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+        val fill = if (night) {
+            Color.argb(0xF0, 0x2C, 0x2C, 0x2E)
+        } else {
+            Color.argb(0xF0, 0xF2, 0xF2, 0xF2)
+        }
+        val stroke = if (night) {
+            Color.argb(0x33, 0xFF, 0xFF, 0xFF)
+        } else {
+            Color.argb(0x1F, 0x00, 0x00, 0x00)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            backdrop.setRenderEffect(
-                RenderEffect.createBlurEffect(24f, 24f, Shader.TileMode.CLAMP)
-            )
+        backdrop.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fill)
+            setStroke(dp(1f).coerceAtLeast(1), stroke)
         }
+        // No elevation on the backdrop: elevation reorders z within the parent,
+        // so raising it paints the capsule over the reactions instead of behind
+        // them. Child order alone puts the backdrop first.
     }
 
     fun apply(items: List<Renderable>, selectedId: String?) {

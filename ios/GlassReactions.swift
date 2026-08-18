@@ -55,7 +55,6 @@ struct Renderable {
 final class ReactionsPillView: UIView {
 
   private var renderables: [Renderable] = []
-  private var itemViews: [UIView] = []
   private var imageViews: [UIImageView] = []
 
   /// The capsule behind the reactions — a glass container on iOS 26, a blur
@@ -87,10 +86,14 @@ final class ReactionsPillView: UIView {
 
     #if compiler(>=6.2)
       if usingGlass, #available(iOS 26.0, *) {
-        let container = UIVisualEffectView(effect: UIGlassContainerEffect())
-        addSubview(container)
-        backdrop = container
-        contentHost = container.contentView
+        // One capsule behind the whole row, not a pill per reaction. M3 may
+        // reintroduce per-item glass inside a UIGlassContainerEffect so pills
+        // can merge and separate during the expand animation; until there is an
+        // animation to serve, separate pills are just visual noise.
+        let capsule = UIVisualEffectView(effect: UIGlassEffect())
+        addSubview(capsule)
+        backdrop = capsule
+        contentHost = capsule.contentView
         return
       }
     #endif
@@ -119,26 +122,10 @@ final class ReactionsPillView: UIView {
   }
 
   private func rebuildItemViews() {
-    for view in itemViews { view.removeFromSuperview() }
-    itemViews.removeAll()
+    for view in imageViews { view.removeFromSuperview() }
     imageViews.removeAll()
 
     for renderable in renderables {
-      let host: UIView
-
-      #if compiler(>=6.2)
-        if usingGlass, #available(iOS 26.0, *) {
-          // Individual glass pills inside the container merge and separate as
-          // the container's spacing threshold is crossed — this is the
-          // structure M3 animates, not a decoration.
-          host = UIVisualEffectView(effect: UIGlassEffect())
-        } else {
-          host = UIView()
-        }
-      #else
-        host = UIView()
-      #endif
-
       let imageView = UIImageView()
       imageView.contentMode = .scaleAspectFit
       // Rasterised at max size and scaled down, never up (spec §6.5).
@@ -148,15 +135,11 @@ final class ReactionsPillView: UIView {
         imageView.tintColor = .label
       }
 
-      let contentTarget = (host as? UIVisualEffectView)?.contentView ?? host
-      contentTarget.addSubview(imageView)
+      imageView.isAccessibilityElement = true
+      imageView.accessibilityLabel = renderable.accessibilityLabel
+      imageView.accessibilityTraits = .button
 
-      host.isAccessibilityElement = true
-      host.accessibilityLabel = renderable.accessibilityLabel
-      host.accessibilityTraits = .button
-
-      contentHost.addSubview(host)
-      itemViews.append(host)
+      contentHost.addSubview(imageView)
       imageViews.append(imageView)
     }
   }
@@ -199,16 +182,10 @@ final class ReactionsPillView: UIView {
     var x = Metrics.contentInset
     let y = (bounds.height - Metrics.itemSize) / 2
 
-    for host in itemViews {
-      host.frame = CGRect(x: x, y: y, width: Metrics.itemSize, height: Metrics.itemSize)
-      host.layer.cornerRadius = Metrics.itemSize / 2
-      host.layer.cornerCurve = .continuous
-
-      let contentTarget = (host as? UIVisualEffectView)?.contentView ?? host
-      for sub in contentTarget.subviews {
-        sub.frame = contentTarget.bounds
-      }
-
+    for imageView in imageViews {
+      imageView.frame = CGRect(
+        x: x, y: y, width: Metrics.itemSize, height: Metrics.itemSize
+      )
       x += Metrics.itemSize + Metrics.itemSpacing
     }
   }
