@@ -64,9 +64,8 @@ final class ReactionsPillView: UIView {
   /// view below that, an opaque view under Reduce Transparency.
   private var backdrop: UIView!
 
-  /// Container that per-item content is added to. On the glass path this is
-  /// the container effect view's `contentView` so pills participate in the
-  /// glass union; otherwise it is the backdrop itself.
+  /// Container the reactions are added to — the effect view's `contentView`
+  /// on the glass and blur paths, the backdrop itself when opaque.
   private var contentHost: UIView!
 
   private var usingGlass = false
@@ -89,10 +88,9 @@ final class ReactionsPillView: UIView {
 
     #if compiler(>=6.2)
       if usingGlass, #available(iOS 26.0, *) {
-        // One capsule behind the whole row, not a pill per reaction. M3 may
-        // reintroduce per-item glass inside a UIGlassContainerEffect so pills
-        // can merge and separate during the expand animation; until there is an
-        // animation to serve, separate pills are just visual noise.
+        // One capsule behind the whole row, not a pill per reaction. The
+        // per-item glass of spec §4.4 is superseded by the single-container
+        // design decision recorded there.
         let capsule = UIVisualEffectView(effect: UIGlassEffect())
         addSubview(capsule)
         backdrop = capsule
@@ -376,33 +374,5 @@ enum ReactionResolver {
         accessibilityLabel: item.accessibilityLabel
       )
     }
-  }
-}
-
-// MARK: - Hybrid
-
-class HybridGlassReactions: HybridGlassReactionsSpec {
-
-  var view: UIView = ReactionsPillView()
-
-  private var pillView: ReactionsPillView { view as! ReactionsPillView }
-
-  var items: [NativeReactionItem] = [] {
-    didSet { resolve() }
-  }
-
-  var renderMode: ReactionRenderMode = .auto {
-    didSet { resolve() }
-  }
-
-  var selectedId: String? {
-    didSet { resolve() }
-  }
-
-  private func resolve() {
-    pillView.apply(
-      items: ReactionResolver.resolve(items, renderMode: renderMode),
-      selectedId: selectedId
-    )
   }
 }

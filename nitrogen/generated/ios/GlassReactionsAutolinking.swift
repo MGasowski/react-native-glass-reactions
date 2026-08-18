@@ -12,18 +12,6 @@ import NitroModules
 public final class GlassReactionsAutolinking {
   public typealias bridge = margelo.nitro.glassreactions.bridge.swift
 
-  public static func createGlassReactions() -> bridge.std__shared_ptr_HybridGlassReactionsSpec_ {
-    let hybridObject = HybridGlassReactions()
-    return { () -> bridge.std__shared_ptr_HybridGlassReactionsSpec_ in
-      let __cxxWrapped = hybridObject.getCxxWrapper()
-      return __cxxWrapped.getCxxPart()
-    }()
-  }
-  
-  public static func isGlassReactionsRecyclable() -> Bool {
-    return HybridGlassReactions.self is any RecyclableView.Type
-  }
-  
   public static func createReactionsHost() -> bridge.std__shared_ptr_HybridReactionsHostSpec_ {
     let hybridObject = HybridReactionsHost()
     return { () -> bridge.std__shared_ptr_HybridReactionsHostSpec_ in

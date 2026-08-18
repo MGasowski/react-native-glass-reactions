@@ -8,8 +8,6 @@
 #pragma once
 
 // Forward declarations of C++ defined types
-// Forward declaration of `HybridGlassReactionsSpec` to properly resolve imports.
-namespace margelo::nitro::glassreactions { class HybridGlassReactionsSpec; }
 // Forward declaration of `HybridReactionsHostSpec` to properly resolve imports.
 namespace margelo::nitro::glassreactions { class HybridReactionsHostSpec; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
@@ -18,7 +16,6 @@ namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
 // Include C++ defined types
-#include "HybridGlassReactionsSpec.hpp"
 #include "HybridReactionsHostSpec.hpp"
 #include "NativeReactionItem.hpp"
 #include "ReactionRenderMode.hpp"
@@ -40,8 +37,6 @@ namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
-// Forward declaration of `HybridGlassReactionsSpec_cxx` to properly resolve imports.
-namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
 // Forward declaration of `HybridReactionsHostSpec_cxx` to properly resolve imports.
 namespace GlassReactions { class HybridReactionsHostSpec_cxx; }
 

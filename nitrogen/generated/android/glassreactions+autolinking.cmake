@@ -33,12 +33,8 @@ target_sources(
   # Autolinking Setup
   ../nitrogen/generated/android/glassreactionsOnLoad.cpp
   # Shared Nitrogen C++ sources
-  ../nitrogen/generated/shared/c++/HybridGlassReactionsSpec.cpp
-  ../nitrogen/generated/shared/c++/views/HybridGlassReactionsComponent.cpp
   ../nitrogen/generated/shared/c++/HybridReactionsHostSpec.cpp
   # Android-specific Nitrogen C++ sources
-  ../nitrogen/generated/android/c++/JHybridGlassReactionsSpec.cpp
-  ../nitrogen/generated/android/c++/views/JHybridGlassReactionsStateUpdater.cpp
   ../nitrogen/generated/android/c++/JHybridReactionsHostSpec.cpp
 )
 

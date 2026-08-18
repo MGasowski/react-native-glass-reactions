@@ -8,21 +8,16 @@
 #pragma once
 
 // Forward declarations of C++ defined types
-// Forward declaration of `HybridGlassReactionsSpec` to properly resolve imports.
-namespace margelo::nitro::glassreactions { class HybridGlassReactionsSpec; }
 // Forward declaration of `HybridReactionsHostSpec` to properly resolve imports.
 namespace margelo::nitro::glassreactions { class HybridReactionsHostSpec; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
 // Forward declarations of Swift defined types
-// Forward declaration of `HybridGlassReactionsSpec_cxx` to properly resolve imports.
-namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
 // Forward declaration of `HybridReactionsHostSpec_cxx` to properly resolve imports.
 namespace GlassReactions { class HybridReactionsHostSpec_cxx; }
 
 // Include C++ defined types
-#include "HybridGlassReactionsSpec.hpp"
 #include "HybridReactionsHostSpec.hpp"
 #include "NativeReactionItem.hpp"
 #include <NitroModules/Result.hpp>
@@ -64,18 +59,6 @@ namespace margelo::nitro::glassreactions::bridge::swift {
     vector.reserve(size);
     return vector;
   }
-  
-  // pragma MARK: std::shared_ptr<HybridGlassReactionsSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridGlassReactionsSpec>`.
-   */
-  using std__shared_ptr_HybridGlassReactionsSpec_ = std::shared_ptr<HybridGlassReactionsSpec>;
-  std::shared_ptr<HybridGlassReactionsSpec> create_std__shared_ptr_HybridGlassReactionsSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridGlassReactionsSpec_(std__shared_ptr_HybridGlassReactionsSpec_ cppType);
-  
-  // pragma MARK: std::weak_ptr<HybridGlassReactionsSpec>
-  using std__weak_ptr_HybridGlassReactionsSpec_ = std::weak_ptr<HybridGlassReactionsSpec>;
-  inline std__weak_ptr_HybridGlassReactionsSpec_ weakify_std__shared_ptr_HybridGlassReactionsSpec_(const std::shared_ptr<HybridGlassReactionsSpec>& strong) noexcept { return strong; }
   
   // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>
   /**

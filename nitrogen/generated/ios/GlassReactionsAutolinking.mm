@@ -10,7 +10,6 @@
 #import "GlassReactions-Swift-Cxx-Umbrella.hpp"
 #import <type_traits>
 
-#include "HybridGlassReactionsSpecSwift.hpp"
 #include "HybridReactionsHostSpecSwift.hpp"
 
 @interface GlassReactionsAutolinking : NSObject
@@ -22,13 +21,6 @@
   using namespace margelo::nitro;
   using namespace margelo::nitro::glassreactions;
 
-  HybridObjectRegistry::registerHybridObjectConstructor(
-    "GlassReactions",
-    []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridGlassReactionsSpec> hybridObject = GlassReactions::GlassReactionsAutolinking::createGlassReactions();
-      return hybridObject;
-    }
-  );
   HybridObjectRegistry::registerHybridObjectConstructor(
     "ReactionsHost",
     []() -> std::shared_ptr<HybridObject> {

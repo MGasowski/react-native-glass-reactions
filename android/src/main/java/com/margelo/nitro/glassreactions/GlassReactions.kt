@@ -14,8 +14,6 @@ import android.widget.ImageView
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
-import com.facebook.proguard.annotations.DoNotStrip
-import com.facebook.react.uimanager.ThemedReactContext
 import kotlin.math.max
 
 /**
@@ -285,54 +283,5 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         val baseline = side / 2f - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(value, side / 2f, baseline, paint)
         return bitmap
-    }
-}
-
-@DoNotStrip
-class HybridGlassReactions(val context: ThemedReactContext) : HybridGlassReactionsSpec() {
-
-    private val pillView = ReactionsPillView(context)
-
-    override val view: View = pillView
-
-    private var _items: Array<NativeReactionItem> = emptyArray()
-    override var items: Array<NativeReactionItem>
-        get() = _items
-        set(value) {
-            _items = value
-            resolve()
-        }
-
-    private var _renderMode: ReactionRenderMode = ReactionRenderMode.AUTO
-    override var renderMode: ReactionRenderMode
-        get() = _renderMode
-        set(value) {
-            _renderMode = value
-            resolve()
-        }
-
-    private var _selectedId: String? = null
-    override var selectedId: String?
-        get() = _selectedId
-        set(value) {
-            _selectedId = value
-            resolve()
-        }
-
-    /**
-     * Android renders emoji only in 1.0. `symbolAndroid` names a Material
-     * Symbol, which requires shipping the Material Symbols font in the AAR —
-     * deferred rather than dropped. Because `emoji` is required on every item
-     * (spec §5), falling back costs nothing and never blanks the picker.
-     */
-    private fun resolve() {
-        val renderables = _items.map { item ->
-            Renderable(
-                id = item.id,
-                bitmap = pillView.rasteriseEmoji(item.emoji),
-                accessibilityLabel = item.accessibilityLabel
-            )
-        }
-        pillView.apply(renderables, _selectedId)
     }
 }
