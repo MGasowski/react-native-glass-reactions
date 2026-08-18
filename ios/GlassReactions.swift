@@ -144,6 +144,18 @@ final class ReactionsPillView: UIView {
     }
   }
 
+  /// Highlights the reaction under the finger. Plain transform for now — M3
+  /// replaces this with the tuned spring and the glass merge/separate.
+  func setFocusedIndex(_ index: Int?) {
+    for (position, imageView) in imageViews.enumerated() {
+      let focused = position == index
+      imageView.transform =
+        focused
+        ? CGAffineTransform(scaleX: Metrics.maxFocusScale, y: Metrics.maxFocusScale)
+        : .identity
+    }
+  }
+
   private func applySelection(_ selectedId: String?) {
     // Symbols are monochrome and carry no colour of their own, so selection is
     // expressed as a tint. Emoji bring their own colour and are left alone.
@@ -248,31 +260,18 @@ private enum ReactionRasteriser {
   }
 }
 
-// MARK: - Hybrid
+// MARK: - Resolution
 
-class HybridGlassReactions: HybridGlassReactionsSpec {
-
-  var view: UIView = ReactionsPillView()
-
-  private var pillView: ReactionsPillView { view as! ReactionsPillView }
-
-  var items: [NativeReactionItem] = [] {
-    didSet { resolve() }
-  }
-
-  var renderMode: ReactionRenderMode = .auto {
-    didSet { resolve() }
-  }
-
-  var selectedId: String? {
-    didSet { resolve() }
-  }
-
-  /// Resolves each item down to a drawable once, applying the fallback chain
-  /// from spec §5: prefer a symbol under `auto` when one is supplied and
-  /// actually resolves, otherwise emoji — which is always present.
-  private func resolve() {
-    let renderables: [Renderable] = items.map { item in
+/// Turns items into drawables once, applying the fallback chain from spec §5:
+/// prefer a symbol under `auto` when one is supplied and actually resolves,
+/// otherwise emoji — which is required on every item, so this never yields
+/// nothing to draw. Shared by the standalone view and the host.
+enum ReactionResolver {
+  static func resolve(
+    _ items: [NativeReactionItem],
+    renderMode: ReactionRenderMode
+  ) -> [Renderable] {
+    items.map { item in
       var image: UIImage?
       var isSymbol = false
 
@@ -293,7 +292,33 @@ class HybridGlassReactions: HybridGlassReactionsSpec {
         accessibilityLabel: item.accessibilityLabel
       )
     }
+  }
+}
 
-    pillView.apply(items: renderables, selectedId: selectedId)
+// MARK: - Hybrid
+
+class HybridGlassReactions: HybridGlassReactionsSpec {
+
+  var view: UIView = ReactionsPillView()
+
+  private var pillView: ReactionsPillView { view as! ReactionsPillView }
+
+  var items: [NativeReactionItem] = [] {
+    didSet { resolve() }
+  }
+
+  var renderMode: ReactionRenderMode = .auto {
+    didSet { resolve() }
+  }
+
+  var selectedId: String? {
+    didSet { resolve() }
+  }
+
+  private func resolve() {
+    pillView.apply(
+      items: ReactionResolver.resolve(items, renderMode: renderMode),
+      selectedId: selectedId
+    )
   }
 }

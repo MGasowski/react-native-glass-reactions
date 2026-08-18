@@ -23,4 +23,16 @@ public final class GlassReactionsAutolinking {
   public static func isGlassReactionsRecyclable() -> Bool {
     return HybridGlassReactions.self is any RecyclableView.Type
   }
+  
+  public static func createReactionsHost() -> bridge.std__shared_ptr_HybridReactionsHostSpec_ {
+    let hybridObject = HybridReactionsHost()
+    return { () -> bridge.std__shared_ptr_HybridReactionsHostSpec_ in
+      let __cxxWrapped = hybridObject.getCxxWrapper()
+      return __cxxWrapped.getCxxPart()
+    }()
+  }
+  
+  public static func isReactionsHostRecyclable() -> Bool {
+    return HybridReactionsHost.self is any RecyclableView.Type
+  }
 }

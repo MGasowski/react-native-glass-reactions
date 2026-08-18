@@ -17,6 +17,9 @@
 
 #include "JHybridGlassReactionsSpec.hpp"
 #include "views/JHybridGlassReactionsStateUpdater.hpp"
+#include "JHybridReactionsHostSpec.hpp"
+#include "JFunc_void_std__string_std__optional_std__string_.hpp"
+#include "JFunc_void_std__string.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::glassreactions {
@@ -35,6 +38,14 @@ struct JHybridGlassReactionsSpecImpl: public jni::JavaClass<JHybridGlassReaction
     return javaPart->getJHybridGlassReactionsSpec();
   }
 };
+struct JHybridReactionsHostSpecImpl: public jni::JavaClass<JHybridReactionsHostSpecImpl, JHybridReactionsHostSpec::JavaPart> {
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/glassreactions/HybridReactionsHost;";
+  static std::shared_ptr<JHybridReactionsHostSpec> create() {
+    static const auto constructorFn = javaClassStatic()->getConstructor<JHybridReactionsHostSpecImpl::javaobject()>();
+    jni::local_ref<JHybridReactionsHostSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
+    return javaPart->getJHybridReactionsHostSpec();
+  }
+};
 
 void registerAllNatives() {
   using namespace margelo::nitro;
@@ -43,12 +54,21 @@ void registerAllNatives() {
   // Register native JNI methods
   margelo::nitro::glassreactions::JHybridGlassReactionsSpec::CxxPart::registerNatives();
   margelo::nitro::glassreactions::views::JHybridGlassReactionsStateUpdater::registerNatives();
+  margelo::nitro::glassreactions::JHybridReactionsHostSpec::CxxPart::registerNatives();
+  margelo::nitro::glassreactions::JFunc_void_std__string_std__optional_std__string__cxx::registerNatives();
+  margelo::nitro::glassreactions::JFunc_void_std__string_cxx::registerNatives();
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(
     "GlassReactions",
     []() -> std::shared_ptr<HybridObject> {
       return JHybridGlassReactionsSpecImpl::create();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "ReactionsHost",
+    []() -> std::shared_ptr<HybridObject> {
+      return JHybridReactionsHostSpecImpl::create();
     }
   );
 }

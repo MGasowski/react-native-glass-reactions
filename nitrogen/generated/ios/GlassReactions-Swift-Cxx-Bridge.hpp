@@ -10,16 +10,24 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridGlassReactionsSpec` to properly resolve imports.
 namespace margelo::nitro::glassreactions { class HybridGlassReactionsSpec; }
+// Forward declaration of `HybridReactionsHostSpec` to properly resolve imports.
+namespace margelo::nitro::glassreactions { class HybridReactionsHostSpec; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridGlassReactionsSpec_cxx` to properly resolve imports.
 namespace GlassReactions { class HybridGlassReactionsSpec_cxx; }
+// Forward declaration of `HybridReactionsHostSpec_cxx` to properly resolve imports.
+namespace GlassReactions { class HybridReactionsHostSpec_cxx; }
 
 // Include C++ defined types
 #include "HybridGlassReactionsSpec.hpp"
+#include "HybridReactionsHostSpec.hpp"
 #include "NativeReactionItem.hpp"
+#include <NitroModules/Result.hpp>
+#include <exception>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -68,5 +76,70 @@ namespace margelo::nitro::glassreactions::bridge::swift {
   // pragma MARK: std::weak_ptr<HybridGlassReactionsSpec>
   using std__weak_ptr_HybridGlassReactionsSpec_ = std::weak_ptr<HybridGlassReactionsSpec>;
   inline std__weak_ptr_HybridGlassReactionsSpec_ weakify_std__shared_ptr_HybridGlassReactionsSpec_(const std::shared_ptr<HybridGlassReactionsSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&, const std::optional<std::string>&)>`.
+   */
+  using Func_void_std__string_std__optional_std__string_ = std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * triggerId * /, const std::optional<std::string>& / * reactionId * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_std__optional_std__string__Wrapper final {
+  public:
+    explicit Func_void_std__string_std__optional_std__string__Wrapper(std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>>(std::move(func))) {}
+    inline void call(std::string triggerId, std::optional<std::string> reactionId) const noexcept {
+      _function->operator()(triggerId, reactionId);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string_std__optional_std__string_ create_Func_void_std__string_std__optional_std__string_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_std__optional_std__string__Wrapper wrap_Func_void_std__string_std__optional_std__string_(Func_void_std__string_std__optional_std__string_ value) noexcept {
+    return Func_void_std__string_std__optional_std__string__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* triggerId */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* triggerId */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * triggerId * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* triggerId */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* triggerId */)>>(std::move(func))) {}
+    inline void call(std::string triggerId) const noexcept {
+      _function->operator()(triggerId);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* triggerId */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridReactionsHostSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridReactionsHostSpec>`.
+   */
+  using std__shared_ptr_HybridReactionsHostSpec_ = std::shared_ptr<HybridReactionsHostSpec>;
+  std::shared_ptr<HybridReactionsHostSpec> create_std__shared_ptr_HybridReactionsHostSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridReactionsHostSpec_(std__shared_ptr_HybridReactionsHostSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridReactionsHostSpec>
+  using std__weak_ptr_HybridReactionsHostSpec_ = std::weak_ptr<HybridReactionsHostSpec>;
+  inline std__weak_ptr_HybridReactionsHostSpec_ weakify_std__shared_ptr_HybridReactionsHostSpec_(const std::shared_ptr<HybridReactionsHostSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<void>
+  using Result_void_ = Result<void>;
+  inline Result_void_ create_Result_void_() noexcept {
+    return Result<void>::withValue();
+  }
+  inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
+    return Result<void>::withError(error);
+  }
 
 } // namespace margelo::nitro::glassreactions::bridge::swift

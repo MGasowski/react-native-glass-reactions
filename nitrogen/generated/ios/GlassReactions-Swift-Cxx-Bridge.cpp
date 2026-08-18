@@ -10,6 +10,7 @@
 // Include C++ implementation defined types
 #include "GlassReactions-Swift-Cxx-Umbrella.hpp"
 #include "HybridGlassReactionsSpecSwift.hpp"
+#include "HybridReactionsHostSpecSwift.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
 namespace margelo::nitro::glassreactions::bridge::swift {
@@ -27,6 +28,38 @@ namespace margelo::nitro::glassreactions::bridge::swift {
     }
     #endif
     GlassReactions::HybridGlassReactionsSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>
+  Func_void_std__string_std__optional_std__string_ create_Func_void_std__string_std__optional_std__string_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = GlassReactions::Func_void_std__string_std__optional_std__string_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& triggerId, const std::optional<std::string>& reactionId) mutable -> void {
+      swiftClosure.call(triggerId, reactionId);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* triggerId */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = GlassReactions::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& triggerId) mutable -> void {
+      swiftClosure.call(triggerId);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridReactionsHostSpec>
+  std::shared_ptr<HybridReactionsHostSpec> create_std__shared_ptr_HybridReactionsHostSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    GlassReactions::HybridReactionsHostSpec_cxx swiftPart = GlassReactions::HybridReactionsHostSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::glassreactions::HybridReactionsHostSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridReactionsHostSpec_(std__shared_ptr_HybridReactionsHostSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::glassreactions::HybridReactionsHostSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::glassreactions::HybridReactionsHostSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridReactionsHostSpec\" is not implemented in Swift!");
+    }
+    #endif
+    GlassReactions::HybridReactionsHostSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
 

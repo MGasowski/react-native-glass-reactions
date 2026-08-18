@@ -1,16 +1,12 @@
-import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import {
-  isLiquidGlassSupported,
-  ReactionsPicker,
+  ReactionsPickerHost,
+  ReactionTrigger,
   type ReactionId,
   type ReactionItem,
 } from 'react-native-glass-reactions';
 
-/**
- * Every item carries an emoji — the guaranteed fallback — and optionally a
- * symbol that is preferred where it resolves. See spec §5.
- */
 const REACTIONS: readonly ReactionItem[] = [
   {
     id: 'like',
@@ -36,46 +32,77 @@ const REACTIONS: readonly ReactionItem[] = [
     symbol: { ios: 'star.fill' },
     accessibilityLabel: 'Star',
   },
-  {
-    id: 'laugh',
-    emoji: '😂',
-    accessibilityLabel: 'Laugh',
-  },
+  { id: 'laugh', emoji: '😂', accessibilityLabel: 'Laugh' },
 ];
 
+const ROWS = Array.from({ length: 1000 }, (_, index) => index);
+
+const EMOJI_BY_ID: Record<string, string> = Object.fromEntries(
+  REACTIONS.map((reaction) => [reaction.id, reaction.emoji])
+);
+
+function Row({
+  index,
+  selected,
+  onSelect,
+}: {
+  readonly index: number;
+  readonly selected?: ReactionId;
+  readonly onSelect: (index: number, id: ReactionId | null) => void;
+}) {
+  const handleSelect = useCallback(
+    (id: ReactionId | null) => onSelect(index, id),
+    [index, onSelect]
+  );
+
+  return (
+    <ReactionTrigger
+      items={REACTIONS}
+      selected={selected}
+      onSelect={handleSelect}
+      style={styles.row}
+    >
+      <View style={styles.rowInner}>
+        <Text style={styles.rowTitle}>Review #{index + 1}</Text>
+        <Text style={styles.rowBody}>Long-press to score. Drag to choose.</Text>
+      </View>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>
+          {selected ? EMOJI_BY_ID[selected] : '–'}
+        </Text>
+      </View>
+    </ReactionTrigger>
+  );
+}
+
 export default function App() {
-  const [selected] = useState<ReactionId | undefined>('fire');
+  const [scores, setScores] = useState<Record<number, ReactionId>>({});
+
+  const handleSelect = useCallback((index: number, id: ReactionId | null) => {
+    setScores((previous) => {
+      const next = { ...previous };
+      if (id === null) {
+        delete next[index];
+      } else {
+        next[index] = id;
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <View style={styles.container}>
-      {/* Glass reads off whatever is behind it, so the backdrop is the point. */}
-      <Image
-        source={{ uri: 'https://picsum.photos/id/1043/800/1200' }}
-        style={StyleSheet.absoluteFill}
+      {/* Required at the root. Renders nothing; installs the one recognizer. */}
+      <ReactionsPickerHost />
+
+      <FlatList
+        data={ROWS}
+        keyExtractor={(item) => String(item)}
+        renderItem={({ item }) => (
+          <Row index={item} selected={scores[item]} onSelect={handleSelect} />
+        )}
+        contentInsetAdjustmentBehavior="automatic"
       />
-
-      <View style={styles.stack}>
-        <Text style={styles.caption}>
-          renderMode: auto {'—'} symbols where they resolve
-        </Text>
-        <ReactionsPicker
-          items={REACTIONS}
-          selected={selected}
-          style={styles.picker}
-        />
-
-        <Text style={styles.caption}>renderMode: emoji {'—'} forced</Text>
-        <ReactionsPicker
-          items={REACTIONS}
-          selected={selected}
-          renderMode="emoji"
-          style={styles.picker}
-        />
-
-        <Text style={styles.caption}>
-          liquid glass expected: {String(isLiquidGlassSupported)}
-        </Text>
-      </View>
     </View>
   );
 }
@@ -83,26 +110,39 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#101014',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2A2A31',
+  },
+  rowInner: {
+    flex: 1,
+  },
+  rowTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rowBody: {
+    color: '#8E8E98',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  badge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#1E1E25',
   },
-  stack: {
-    alignItems: 'center',
-    gap: 16,
-  },
-  // The native view does not report an intrinsic size to Yoga yet, so M1 needs
-  // an explicit frame: 5 items x 40 + 4 gaps x 8 + 8 inset x 2 = 248 x 56.
-  // Sizing stops being the consumer's problem at M2, when the host presents
-  // the picker natively rather than through RN layout.
-  picker: {
-    width: 248,
-    height: 56,
-  },
-  caption: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowRadius: 4,
+  badgeText: {
+    fontSize: 16,
+    color: '#8E8E98',
   },
 });

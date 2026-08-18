@@ -17,6 +17,16 @@
         "language": "kotlin",
         "implementationClassName": "HybridGlassReactions"
       }
+    },
+    "ReactionsHost": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridReactionsHost"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridReactionsHost"
+      }
     }
   },
   "ignorePaths": ["node_modules"]

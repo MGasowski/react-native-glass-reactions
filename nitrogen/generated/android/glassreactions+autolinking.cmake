@@ -35,9 +35,11 @@ target_sources(
   # Shared Nitrogen C++ sources
   ../nitrogen/generated/shared/c++/HybridGlassReactionsSpec.cpp
   ../nitrogen/generated/shared/c++/views/HybridGlassReactionsComponent.cpp
+  ../nitrogen/generated/shared/c++/HybridReactionsHostSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridGlassReactionsSpec.cpp
   ../nitrogen/generated/android/c++/views/JHybridGlassReactionsStateUpdater.cpp
+  ../nitrogen/generated/android/c++/JHybridReactionsHostSpec.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

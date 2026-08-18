@@ -32,13 +32,13 @@ private object Metrics {
 }
 
 /** A reaction resolved to what actually gets drawn. */
-private data class Renderable(
+internal data class Renderable(
     val id: String,
     val bitmap: Bitmap?,
     val accessibilityLabel: String
 )
 
-private class ReactionsPillView(context: ThemedReactContext) : ViewGroup(context) {
+internal class ReactionsPillView(context: android.content.Context) : ViewGroup(context) {
 
     private val density = context.resources.displayMetrics.density
     private val itemSize = dp(Metrics.ITEM_SIZE_DP)
@@ -112,6 +112,34 @@ private class ReactionsPillView(context: ThemedReactContext) : ViewGroup(context
 
         requestLayout()
         invalidate()
+    }
+
+    /**
+     * Resolution entry point shared with the host. Android renders emoji only in
+     * 1.0 — `symbolAndroid` names a Material Symbol, which needs the Material
+     * Symbols font shipped in the AAR. Because `emoji` is required on every item
+     * (spec §5), falling back costs nothing and never blanks the picker.
+     */
+    fun applyItems(
+        items: Array<NativeReactionItem>,
+        selectedId: String?,
+        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode
+    ) {
+        apply(
+            items.map { Renderable(it.id, rasteriseEmoji(it.emoji), it.accessibilityLabel) },
+            selectedId
+        )
+    }
+
+    /** Highlights the reaction under the finger. M3 replaces this with a spring. */
+    fun setFocusedIndex(index: Int?) {
+        for (position in 1 until childCount) {
+            val child = getChildAt(position)
+            val focused = position - 1 == index
+            val scale = if (focused) Metrics.MAX_FOCUS_SCALE else 1f
+            child.scaleX = scale
+            child.scaleY = scale
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
