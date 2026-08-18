@@ -13,6 +13,9 @@ private enum Metrics {
   /// finger visibly softens it. See spec §6.5.
   static let maxFocusScale: CGFloat = 1.6
 
+  /// How far the focused reaction rises, in its own (pre-scale) coordinates.
+  static let focusLift: CGFloat = 6
+
   static var rasterSize: CGFloat { itemSize * maxFocusScale }
 }
 
@@ -144,15 +147,96 @@ final class ReactionsPillView: UIView {
     }
   }
 
-  /// Highlights the reaction under the finger. Plain transform for now — M3
-  /// replaces this with the tuned spring and the glass merge/separate.
+  // MARK: Animation
+
+  /// Reduce Motion replaces every spring with a plain fade (spec §6.3). Read
+  /// live rather than cached — it can be toggled while the app runs.
+  private var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
+
+  private func spring(
+    duration: TimeInterval,
+    damping: CGFloat,
+    _ animations: @escaping () -> Void
+  ) -> UIViewPropertyAnimator {
+    let timing = UISpringTimingParameters(dampingRatio: damping)
+    let animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
+    animator.addAnimations(animations)
+    return animator
+  }
+
+  /// Collapsed state, set before the picker is attached.
+  func prepareForPresentation() {
+    // Grows from the bottom edge, which is the side nearest the trigger, so the
+    // expansion reads as coming out of the row rather than appearing over it.
+    layer.anchorPoint = CGPoint(x: 0.5, y: 1)
+    alpha = 0
+
+    guard !reduceMotion else {
+      transform = .identity
+      imageViews.forEach { $0.alpha = 1; $0.transform = .identity }
+      return
+    }
+
+    transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
+    for imageView in imageViews {
+      imageView.alpha = 0
+      imageView.transform = CGAffineTransform(scaleX: 0.4, y: 0.4)
+    }
+  }
+
+  func animateIn() {
+    guard !reduceMotion else {
+      UIView.animate(withDuration: 0.15) { self.alpha = 1 }
+      return
+    }
+
+    spring(duration: 0.42, damping: 0.72) {
+      self.alpha = 1
+      self.transform = .identity
+    }.startAnimation()
+
+    // Reactions arrive in sequence rather than all at once. The stagger is
+    // small enough that the whole row is settled well inside the time it takes
+    // to move a finger to it.
+    for (position, imageView) in imageViews.enumerated() {
+      let animator = spring(duration: 0.38, damping: 0.62) {
+        imageView.alpha = 1
+        imageView.transform = .identity
+      }
+      animator.startAnimation(afterDelay: Double(position) * 0.025)
+    }
+  }
+
+  func animateOut(completion: @escaping () -> Void) {
+    let animator = spring(duration: 0.22, damping: 1) {
+      self.alpha = 0
+      if !self.reduceMotion {
+        self.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+      }
+    }
+    animator.addCompletion { _ in completion() }
+    animator.startAnimation()
+  }
+
+  /// Highlights the reaction under the finger.
   func setFocusedIndex(_ index: Int?) {
     for (position, imageView) in imageViews.enumerated() {
       let focused = position == index
-      imageView.transform =
+      let target =
         focused
         ? CGAffineTransform(scaleX: Metrics.maxFocusScale, y: Metrics.maxFocusScale)
+          .translatedBy(x: 0, y: -Metrics.focusLift)
         : .identity
+
+      guard !reduceMotion else {
+        imageView.transform = target
+        continue
+      }
+      // Transform only — animating the item's frame would re-evaluate the
+      // glass effect behind it every frame (spec §6.5).
+      spring(duration: 0.3, damping: 0.58) {
+        imageView.transform = target
+      }.startAnimation()
     }
   }
 

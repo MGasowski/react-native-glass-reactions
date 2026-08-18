@@ -272,8 +272,13 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     origin.y = max(Layout.screenMargin, origin.y)
 
     activePickerFrame = CGRect(origin: origin, size: size)
+    // Collapsed state is set before the frame, because prepareForPresentation
+    // moves the anchor point and assigning `frame` afterwards recomputes the
+    // layer position from it.
+    picker.prepareForPresentation()
     picker.frame = activePickerFrame
     overlay.rootViewController?.view.addSubview(picker)
+    picker.animateIn()
 
     haptics = UIImpactFeedbackGenerator(style: .light)
     // Prepared on open, not on first index change — an unprepared generator
@@ -350,16 +355,16 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     let picker = pickerView
     picker?.setFocusedIndex(nil)
 
-    UIView.animate(
-      withDuration: 0.18,
-      animations: { picker?.alpha = 0 },
-      completion: { _ in
-        // Detached, never deallocated: detaching buys the whole GPU saving,
-        // deallocating would only re-buy construction cost (spec §6.5).
-        picker?.removeFromSuperview()
-        picker?.alpha = 1
-      }
-    )
+    // Teardown is bound to animation-end, not touch-up: onSelect has already
+    // fired above, and detaching now would cut the collapse off mid-flight
+    // (spec §4.3).
+    picker?.animateOut {
+      // Detached, never deallocated: detaching buys the whole GPU saving,
+      // deallocating would only re-buy construction cost (spec §6.5).
+      picker?.removeFromSuperview()
+      picker?.transform = .identity
+      picker?.alpha = 1
+    }
 
     onClose?(triggerId)
   }

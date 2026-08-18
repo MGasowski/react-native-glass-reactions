@@ -109,4 +109,7 @@ android {
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
+  // Spring physics for the expand/collapse and focus animations (spec §4.5).
+  // Small and dependency-free; it is not a peer dependency of the package.
+  implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
 }

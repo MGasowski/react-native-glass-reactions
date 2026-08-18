@@ -66,7 +66,9 @@ Two lifecycle details that are easy to get wrong and are correctness, not polish
 
 ### 4.4 iOS implementation notes
 
-- Glass via `UIGlassEffect` / `UIVisualEffectView` inside a glass container so pills merge below a configured spacing threshold.
+- Glass via `UIGlassEffect` on a single capsule behind the whole row.
+
+  **Superseded:** this originally called for per-reaction glass pills inside a `UIGlassContainerEffect` so they would merge below a spacing threshold. The owner's design decision is one container for all reactions, matching Instagram and WhatsApp, so the per-item pills are gone. Revisit only if a future animation actually needs them — separate pills with nothing to animate read as visual noise.
 - Animation via `UIViewPropertyAnimator` / `CASpringAnimation`. No Reanimated in the loop — two animation systems writing the same layer will fight.
 - Haptics via `UIImpactFeedbackGenerator`, fired from the same code path that detects index change, so visual and tactile feedback are frame-aligned.
 - Presentation in a dedicated overlay window or container above the list, so glass is never clipped by row bounds and z-index is a non-issue.
@@ -296,7 +298,7 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 | M0 | Scaffold | Nitro template builds on both platforms in CI |
 | M1 | Static glass view | Glass pill renders on iOS 26; plain view fallback elsewhere; no crash |
 | M2 | Host + gesture arbitration | Single-instance host, portal presentation, trigger registration, one host-owned recognizer; opens and selects correctly inside a scrolling FlashList on both platforms |
-| M3 | Animation & haptics | Expand/merge/collapse tuned; haptics frame-aligned; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments |
+| M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments |
 | M4 | Android parity | Defined fallback appearance and interaction shipped |
 | M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device |
 | M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates |

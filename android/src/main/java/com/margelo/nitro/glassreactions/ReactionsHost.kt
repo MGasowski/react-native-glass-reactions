@@ -299,7 +299,9 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             leftMargin = left
             topMargin = top
         }
+        pill.prepareForPresentation()
         if (pill.parent == null) layer.addView(pill, params) else pill.layoutParams = params
+        pill.animateIn()
 
         activeRect.set(
             left + overlayLocation[0],
@@ -359,9 +361,13 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
         val pill = picker
         pill?.setFocusedIndex(null)
-        // Detached, not deallocated: detaching is what removes the per-frame
-        // cost; deallocating would only re-buy construction (spec §6.5).
-        pill?.let { (it.parent as? ViewGroup)?.removeView(it) }
+        // Teardown is bound to animation-end, not touch-up: onSelect has fired
+        // above, and detaching now would cut the collapse off (spec §4.3).
+        pill?.animateOut {
+            // Detached, not deallocated: detaching is what removes the per-frame
+            // cost; deallocating would only re-buy construction (spec §6.5).
+            (pill.parent as? ViewGroup)?.removeView(pill)
+        }
 
         onClose?.invoke(triggerId)
     }

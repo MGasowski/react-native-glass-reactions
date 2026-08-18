@@ -4,20 +4,23 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.content.res.Configuration
+import android.provider.Settings
 import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
 import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.uimanager.ThemedReactContext
 import kotlin.math.max
 
 /**
- * Android has no Liquid Glass. The defined fallback is a translucent surface
- * with a RenderEffect blur on API 31+, and a flat translucent surface below
- * that. See spec §4.5.
+ * Android has no Liquid Glass and no backdrop-blur primitive. The defined
+ * fallback is a flat translucent capsule (spec §4.5).
  */
 private object Metrics {
     const val ITEM_SIZE_DP = 40f
@@ -29,6 +32,9 @@ private object Metrics {
      * and scaled down from there, never up. See spec §6.5.
      */
     const val MAX_FOCUS_SCALE = 1.6f
+
+    /** How far the focused reaction rises. */
+    const val FOCUS_LIFT_DP = 6f
 }
 
 /** A reaction resolved to what actually gets drawn. */
@@ -131,14 +137,107 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         )
     }
 
-    /** Highlights the reaction under the finger. M3 replaces this with a spring. */
+    /**
+     * Reduced motion: Android exposes this as the system animator duration
+     * scale being zero rather than a dedicated flag (spec §6.3).
+     */
+    private val reduceMotion: Boolean
+        get() = Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) == 0f
+
+    private fun spring(
+        view: View,
+        property: DynamicAnimation.ViewProperty,
+        target: Float,
+        stiffness: Float = SpringForce.STIFFNESS_MEDIUM,
+        damping: Float = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+    ) {
+        SpringAnimation(view, property).apply {
+            this.spring = SpringForce(target)
+                .setStiffness(stiffness)
+                .setDampingRatio(damping)
+        }.start()
+    }
+
+    /** Collapsed state, set before the picker is attached. */
+    fun prepareForPresentation() {
+        alpha = 0f
+        if (reduceMotion) {
+            scaleX = 1f
+            scaleY = 1f
+            for (position in 1 until childCount) {
+                getChildAt(position).apply { alpha = 1f; scaleX = 1f; scaleY = 1f }
+            }
+            return
+        }
+        // Grows from the bottom edge, the side nearest the trigger.
+        pivotY = (itemSize + contentInset * 2).toFloat()
+        scaleX = 0.86f
+        scaleY = 0.86f
+        for (position in 1 until childCount) {
+            getChildAt(position).apply { alpha = 0f; scaleX = 0.4f; scaleY = 0.4f }
+        }
+    }
+
+    fun animateIn() {
+        if (reduceMotion) {
+            animate().alpha(1f).setDuration(150).start()
+            return
+        }
+        animate().alpha(1f).setDuration(120).start()
+        spring(this, SpringAnimation.SCALE_X, 1f)
+        spring(this, SpringAnimation.SCALE_Y, 1f)
+
+        for (position in 1 until childCount) {
+            val child = getChildAt(position)
+            child.animate()
+                .alpha(1f)
+                .setStartDelay((position - 1) * 25L)
+                .setDuration(140)
+                .withEndAction {
+                    spring(child, SpringAnimation.SCALE_X, 1f)
+                    spring(child, SpringAnimation.SCALE_Y, 1f)
+                }
+                .start()
+        }
+    }
+
+    fun animateOut(completion: () -> Unit) {
+        animate()
+            .alpha(0f)
+            .scaleX(if (reduceMotion) 1f else 0.92f)
+            .scaleY(if (reduceMotion) 1f else 0.92f)
+            .setDuration(180)
+            .withEndAction {
+                alpha = 1f
+                scaleX = 1f
+                scaleY = 1f
+                completion()
+            }
+            .start()
+    }
+
+    /** Highlights the reaction under the finger. */
     fun setFocusedIndex(index: Int?) {
         for (position in 1 until childCount) {
             val child = getChildAt(position)
             val focused = position - 1 == index
             val scale = if (focused) Metrics.MAX_FOCUS_SCALE else 1f
-            child.scaleX = scale
-            child.scaleY = scale
+            val lift = if (focused) -dp(Metrics.FOCUS_LIFT_DP).toFloat() else 0f
+
+            if (reduceMotion) {
+                child.scaleX = scale
+                child.scaleY = scale
+                child.translationY = lift
+                continue
+            }
+            // Scale and translation only — no layout pass per frame.
+            spring(child, SpringAnimation.SCALE_X, scale)
+            spring(child, SpringAnimation.SCALE_Y, scale)
+            spring(child, SpringAnimation.TRANSLATION_Y, lift)
         }
     }
 
