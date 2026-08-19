@@ -1,6 +1,16 @@
 name: Setup
 description: Setup Node.js and install dependencies
 
+inputs:
+  registry-url:
+    description: >-
+      npm registry to authenticate against. Setting this is what makes
+      setup-node write the ~/.npmrc containing ${NODE_AUTH_TOKEN}; without it
+      npm ignores NODE_AUTH_TOKEN entirely and publishing fails with ENEEDAUTH.
+      Only the release job needs it.
+    required: false
+    default: ''
+
 runs:
   using: composite
   steps:
@@ -8,6 +18,7 @@ runs:
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version-file: .nvmrc
+        registry-url: ${{ inputs.registry-url }}
 
     - name: Restore dependencies
       id: yarn-cache

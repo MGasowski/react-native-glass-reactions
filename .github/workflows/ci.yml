@@ -223,11 +223,30 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          # Writes the .npmrc that resolves ${NODE_AUTH_TOKEN} below.
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Build package
         run: yarn prepare
 
+      - name: Check the tag matches the version being published
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+
+          if [[ "$tag_version" != "$pkg_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg_version"
+            exit 1
+          fi
+
+      - name: Verify the tarball contents
+        run: npm pack --dry-run --ignore-scripts
+
+      # --ignore-scripts because "Build package" above already ran prepare.
+      # Letting npm re-run it here would rebuild everything a second time and
+      # add a failure mode between a green build and the actual publish.
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
