@@ -203,13 +203,7 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          script: |
-            cd example/android
-            ./gradlew installDebug
-            cd ../..
-            npx react-native start --port 8081 &
-            adb reverse tcp:8081 tcp:8081
-            maestro test .maestro/reactions.yaml
+          script: ./scripts/e2e-android.sh
 
   release:
     # Tag-triggered publish with npm provenance. Provenance requires id-token
