@@ -211,3 +211,27 @@ cannot fail is worthless.
 
 Not covered: a real `expo prebuild` against a genuine project. That needs an
 Expo example app, which does not exist yet.
+
+## Cutting a release
+
+```sh
+yarn release
+```
+
+release-it bumps the version from the conventional commits, writes `CHANGELOG.md`,
+tags `v<version>` and pushes. The tag triggers the `release` job, which publishes
+to npm with `--provenance`. release-it deliberately does **not** publish itself —
+otherwise the release would either double-publish or publish from a laptop with
+no provenance attestation.
+
+**The first release must pin its version explicitly:**
+
+```sh
+yarn release 0.1.0
+```
+
+Left to itself release-it reads the `feat:` commits in the history and proposes
+`0.2.0`, because it assumes `0.1.0` has already shipped.
+
+Publishing needs an `NPM_TOKEN` repository secret, and provenance additionally
+needs the workflow to run from a public repo with `id-token: write`.
