@@ -50,6 +50,11 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   private var activeTriggerId: String?
   private var activeItems: [NativeReactionItem] = []
   private var activePickerFrame: CGRect = .zero
+  /// Where the trigger was when the picker opened, kept so the selection
+  /// celebration can fly the chosen reaction back to it. Resolved once at
+  /// gesture-begin — good enough, since scrolling is disabled for the whole
+  /// interaction (spec §6.4).
+  private var activeTriggerFrame: CGRect = .zero
   private var focusedIndex: Int?
   private var disabledScrollView: UIScrollView?
   private var haptics: UIImpactFeedbackGenerator?
@@ -276,6 +281,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     origin.y = max(Layout.screenMargin, origin.y)
 
     activePickerFrame = CGRect(origin: origin, size: size)
+    activeTriggerFrame = triggerFrame
     // Collapsed state is set before the frame, because prepareForPresentation
     // moves the anchor point and assigning `frame` afterwards recomputes the
     // layer position from it.
@@ -352,28 +358,52 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       onSelect?(triggerId, selected)
     }
 
+    // The celebration plays on whatever was under the finger, whether that
+    // committed a new selection or cleared the existing one — either way the
+    // user chose that reaction.
+    let celebratedIndex = cancelled ? nil : focusedIndex
+
     disabledScrollView?.panGestureRecognizer.isEnabled = true
     disabledScrollView = nil
 
     activeTriggerId = nil
     activeItems = []
     focusedIndex = nil
-    haptics = nil
 
     let picker = pickerView
-    picker?.setFocusedIndex(nil)
-
     // Teardown is bound to animation-end, not touch-up: onSelect has already
     // fired above, and detaching now would cut the collapse off mid-flight
-    // (spec §4.3).
-    picker?.animateOut {
-      // Detached, never deallocated: detaching buys the whole GPU saving,
-      // deallocating would only re-buy construction cost (spec §6.5).
+    // (spec §4.3). Detached, never deallocated: detaching buys the whole GPU
+    // saving, deallocating would only re-buy construction cost (spec §6.5).
+    let teardown = {
       picker?.removeFromSuperview()
-      picker?.transform = .identity
-      picker?.alpha = 1
+      picker?.resetAfterDismissal()
     }
 
+    if let index = celebratedIndex {
+      // A firmer confirm than the per-item tick; the generator is prepared, so
+      // it lands with the pop.
+      haptics?.impactOccurred(intensity: 1.0)
+
+      // Vector from the chosen reaction's resting centre to the trigger's
+      // centre, both in window coordinates — the overlay is full-screen, so
+      // the picker's frame shares the space.
+      let stride = activePickerFrame.width / CGFloat(max(1, picker?.itemCount ?? 1))
+      let itemCenter = CGPoint(
+        x: activePickerFrame.minX + stride * (CGFloat(index) + 0.5),
+        y: activePickerFrame.midY
+      )
+      let flight = CGPoint(
+        x: activeTriggerFrame.midX - itemCenter.x,
+        y: activeTriggerFrame.midY - itemCenter.y
+      )
+      picker?.animateSelection(at: index, flight: flight, completion: teardown)
+    } else {
+      picker?.setFocusedIndex(nil)
+      picker?.animateOut(completion: teardown)
+    }
+
+    haptics = nil
     onClose?(triggerId)
   }
 }

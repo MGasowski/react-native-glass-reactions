@@ -16,6 +16,21 @@ private enum Metrics {
   /// How far the focused reaction rises, in its own (pre-scale) coordinates.
   static let focusLift: CGFloat = 6
 
+  /// Dock-style magnification: the reactions either side of the focused one
+  /// partially scale and step aside, so dragging across the row reads as a
+  /// wave rather than a binary highlight. Must stay below `maxFocusScale` —
+  /// rasters are only ever scaled down (spec §6.5).
+  static let neighborScale: CGFloat = 1.18
+  static let neighborLift: CGFloat = 2
+  static let neighborShift: CGFloat = 5
+
+  /// How far the chosen reaction overshoots past the focus scale when picked,
+  /// before it flies down to the trigger. Capped by the raster headroom the
+  /// same way `neighborScale` is — this is the one place a raster is shown
+  /// above `maxFocusScale`, and only for a fraction of a second mid-motion,
+  /// where softening is invisible.
+  static let selectionPopScale: CGFloat = 1.9
+
   static var rasterSize: CGFloat { itemSize * maxFocusScale }
 }
 
@@ -60,6 +75,10 @@ final class ReactionsPillView: UIView {
   private var renderables: [Renderable] = []
   private var imageViews: [UIImageView] = []
 
+  /// How many reactions are currently shown; the host uses it to recover the
+  /// per-item stride when computing the selection flight vector.
+  var itemCount: Int { imageViews.count }
+
   /// The capsule behind the reactions — a glass container on iOS 26, a blur
   /// view below that, an opaque view under Reduce Transparency.
   private var backdrop: UIView!
@@ -68,6 +87,17 @@ final class ReactionsPillView: UIView {
   /// collapse can cancel it rather than letting its completion tear down a
   /// picker that is being reused (spec §4.3).
   private var presentationAnimator: UIViewPropertyAnimator?
+
+  /// Per-item animators from the open cascade and the selection celebration.
+  /// Tracked for the same reason as `presentationAnimator`: a long-press
+  /// arriving mid-flight must be able to stop them before reusing the views.
+  private var itemAnimators: [UIViewPropertyAnimator] = []
+
+  /// The effect the backdrop was built with, kept so the selection celebration
+  /// can fade the glass out (by animating `effect` to nil — the only sanctioned
+  /// way to fade a UIVisualEffectView) and restore it when the picker is
+  /// reused.
+  private var backdropEffect: UIVisualEffect?
 
   private var usingGlass = false
 
@@ -92,9 +122,11 @@ final class ReactionsPillView: UIView {
         // One capsule behind the whole row, not a pill per reaction. The
         // per-item glass of spec §4.4 is superseded by the single-container
         // design decision recorded there.
-        let capsule = UIVisualEffectView(effect: UIGlassEffect())
+        let effect = UIGlassEffect()
+        let capsule = UIVisualEffectView(effect: effect)
         addSubview(capsule)
         backdrop = capsule
+        backdropEffect = effect
         return
       }
     #endif
@@ -104,10 +136,13 @@ final class ReactionsPillView: UIView {
       solid.backgroundColor = .secondarySystemBackground
       addSubview(solid)
       backdrop = solid
+      backdropEffect = nil
     } else {
-      let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+      let effect = UIBlurEffect(style: .systemThinMaterial)
+      let blur = UIVisualEffectView(effect: effect)
       addSubview(blur)
       backdrop = blur
+      backdropEffect = effect
     }
   }
 
@@ -167,6 +202,12 @@ final class ReactionsPillView: UIView {
     // detach the picker that is being reopened.
     presentationAnimator?.stopAnimation(true)
     presentationAnimator = nil
+    for animator in itemAnimators { animator.stopAnimation(true) }
+    itemAnimators.removeAll()
+
+    // A reopen can land mid-celebration, with the backdrop's effect animated
+    // away and item state scattered. Restore everything before collapsing.
+    restoreBackdrop()
 
     // Grows from the bottom edge, which is the side nearest the trigger, so the
     // expansion reads as coming out of the row rather than appearing over it.
@@ -175,14 +216,18 @@ final class ReactionsPillView: UIView {
 
     guard !reduceMotion else {
       transform = .identity
-      imageViews.forEach { $0.alpha = 1; $0.transform = .identity }
+      imageViews.forEach { $0.alpha = 1; $0.transform = .identity; $0.layer.zPosition = 0 }
       return
     }
 
     transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
     for imageView in imageViews {
       imageView.alpha = 0
-      imageView.transform = CGAffineTransform(scaleX: 0.4, y: 0.4)
+      imageView.layer.zPosition = 0
+      // Each reaction starts small and below its resting place, so the open
+      // reads as the row rising out of the trigger rather than materialising.
+      imageView.transform = CGAffineTransform(translationX: 0, y: 10)
+        .scaledBy(x: 0.4, y: 0.4)
     }
   }
 
@@ -192,7 +237,7 @@ final class ReactionsPillView: UIView {
       return
     }
 
-    let animator = spring(duration: 0.42, damping: 0.72) {
+    let animator = spring(duration: 0.45, damping: 0.72) {
       self.alpha = 1
       self.transform = .identity
     }
@@ -203,19 +248,23 @@ final class ReactionsPillView: UIView {
     // small enough that the whole row is settled well inside the time it takes
     // to move a finger to it.
     for (position, imageView) in imageViews.enumerated() {
-      let animator = spring(duration: 0.38, damping: 0.62) {
+      let animator = spring(duration: 0.42, damping: 0.58) {
         imageView.alpha = 1
         imageView.transform = .identity
       }
-      animator.startAnimation(afterDelay: Double(position) * 0.025)
+      itemAnimators.append(animator)
+      animator.startAnimation(afterDelay: Double(position) * 0.03)
     }
   }
 
   func animateOut(completion: @escaping () -> Void) {
-    let animator = spring(duration: 0.22, damping: 1) {
+    let animator = spring(duration: 0.25, damping: 1) {
       self.alpha = 0
       if !self.reduceMotion {
-        self.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+        // Sinks back toward the trigger it grew out of — the inverse of the
+        // open — rather than shrinking in place.
+        self.transform = CGAffineTransform(translationX: 0, y: 6)
+          .scaledBy(x: 0.9, y: 0.9)
       }
     }
     animator.addCompletion { [weak self] position in
@@ -228,25 +277,134 @@ final class ReactionsPillView: UIView {
     animator.startAnimation()
   }
 
-  /// Highlights the reaction under the finger.
+  /// The selection celebration: everything that was not chosen shrinks away,
+  /// staggered outward from the choice; the chosen reaction pops past its focus
+  /// scale, then shrinks and flies along `flight` — the vector from its resting
+  /// position to the trigger — so the reaction reads as landing on the row that
+  /// was pressed. All transform and effect animation, no geometry (spec §6.5).
+  func animateSelection(
+    at index: Int,
+    flight: CGPoint,
+    completion: @escaping () -> Void
+  ) {
+    guard !reduceMotion, index < imageViews.count else {
+      animateOut(completion: completion)
+      return
+    }
+
+    // The capsule leaves first: glass fades by animating its effect away (the
+    // sanctioned fade for UIVisualEffectView), a solid backdrop by alpha, and
+    // both sink slightly as they go.
+    let backdropAnimator = spring(duration: 0.3, damping: 1) {
+      if let effectView = self.backdrop as? UIVisualEffectView {
+        effectView.effect = nil
+      } else {
+        self.backdrop.alpha = 0
+      }
+      self.backdrop.transform = CGAffineTransform(translationX: 0, y: 4)
+        .scaledBy(x: 0.9, y: 0.9)
+    }
+    itemAnimators.append(backdropAnimator)
+    backdropAnimator.startAnimation()
+
+    // Non-selected reactions shrink away in a wave spreading outward from the
+    // choice, so the eye is pulled toward what was picked.
+    for (position, imageView) in imageViews.enumerated() where position != index {
+      let animator = spring(duration: 0.24, damping: 1) {
+        imageView.alpha = 0
+        imageView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
+      }
+      itemAnimators.append(animator)
+      animator.startAnimation(afterDelay: Double(abs(position - index)) * 0.03)
+    }
+
+    // The choice pops past its focus scale…
+    let chosen = imageViews[index]
+    chosen.layer.zPosition = 2
+    let pop = spring(duration: 0.3, damping: 0.5) {
+      chosen.transform = CGAffineTransform(
+        scaleX: Metrics.selectionPopScale, y: Metrics.selectionPopScale
+      )
+      .translatedBy(x: 0, y: -Metrics.focusLift)
+    }
+    itemAnimators.append(pop)
+    pop.startAnimation()
+
+    // …then flies down to the trigger. This is the tracked animator: teardown
+    // is bound to its end, and a reopen mid-flight cancels it (spec §4.3).
+    let depart = spring(duration: 0.35, damping: 1) {
+      chosen.alpha = 0
+      chosen.transform = CGAffineTransform(translationX: flight.x, y: flight.y)
+        .scaledBy(x: 0.2, y: 0.2)
+    }
+    depart.addCompletion { [weak self] position in
+      self?.presentationAnimator = nil
+      if position == .end { completion() }
+    }
+    presentationAnimator = depart
+    depart.startAnimation(afterDelay: 0.18)
+  }
+
+  /// Puts the pooled instance back to a clean resting state after teardown, so
+  /// the next open never inherits leftover transforms, alphas, or a faded
+  /// backdrop. Called by the host once the closing animation has finished.
+  func resetAfterDismissal() {
+    transform = .identity
+    alpha = 1
+    restoreBackdrop()
+    for imageView in imageViews {
+      imageView.alpha = 1
+      imageView.transform = .identity
+      imageView.layer.zPosition = 0
+    }
+  }
+
+  private func restoreBackdrop() {
+    if let effectView = backdrop as? UIVisualEffectView {
+      effectView.effect = backdropEffect
+    }
+    backdrop.alpha = 1
+    backdrop.transform = .identity
+  }
+
+  /// Highlights the reaction under the finger. Dock-style: the focused
+  /// reaction rises to full scale, its immediate neighbours partially follow
+  /// and step aside, and everything else settles back — so a drag across the
+  /// row reads as a travelling wave rather than a binary highlight.
   func setFocusedIndex(_ index: Int?) {
     for (position, imageView) in imageViews.enumerated() {
       let focused = position == index
-      let target =
-        focused
-        ? CGAffineTransform(scaleX: Metrics.maxFocusScale, y: Metrics.maxFocusScale)
+      let isNeighbor = index != nil && abs(position - index!) == 1
+
+      let target: CGAffineTransform
+      var targetAlpha: CGFloat = 1
+      if focused {
+        target = CGAffineTransform(scaleX: Metrics.maxFocusScale, y: Metrics.maxFocusScale)
           .translatedBy(x: 0, y: -Metrics.focusLift)
-        : .identity
+      } else if isNeighbor {
+        // Pushed away from the focused item so the magnified raster has room.
+        let direction: CGFloat = position < index! ? -1 : 1
+        target = CGAffineTransform(
+          translationX: direction * Metrics.neighborShift, y: 0
+        )
+        .scaledBy(x: Metrics.neighborScale, y: Metrics.neighborScale)
+        .translatedBy(x: 0, y: -Metrics.neighborLift)
+      } else {
+        target = .identity
+        // A whisper of dimming on the far items keeps the eye on the wave.
+        targetAlpha = index != nil ? 0.85 : 1
+      }
 
       guard !reduceMotion else {
         imageView.transform = target
+        imageView.alpha = 1
         continue
       }
 
       // zPosition, not bringSubviewToFront: reordering the view hierarchy
       // invalidates layout, layoutSubviews then reassigns this view's frame,
       // and that cancels the transform animation the instant it starts.
-      imageView.layer.zPosition = focused ? 1 : 0
+      imageView.layer.zPosition = focused ? 2 : (isNeighbor ? 1 : 0)
 
       // `.beginFromCurrentState` is the whole point: dragging across the row
       // retargets this animation many times per second, and without it each new
@@ -267,6 +425,7 @@ final class ReactionsPillView: UIView {
         options: [.beginFromCurrentState, .allowUserInteraction]
       ) {
         imageView.transform = target
+        imageView.alpha = targetAlpha
       }
     }
   }

@@ -14,6 +14,7 @@ import android.widget.ImageView
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
+import kotlin.math.abs
 import kotlin.math.max
 
 /**
@@ -33,6 +34,24 @@ private object Metrics {
 
     /** How far the focused reaction rises. */
     const val FOCUS_LIFT_DP = 6f
+
+    /**
+     * Dock-style magnification: the reactions either side of the focused one
+     * partially scale and step aside, so a drag across the row reads as a
+     * travelling wave rather than a binary highlight. Below MAX_FOCUS_SCALE —
+     * rasters are only ever scaled down (spec §6.5).
+     */
+    const val NEIGHBOR_SCALE = 1.18f
+    const val NEIGHBOR_LIFT_DP = 2f
+    const val NEIGHBOR_SHIFT_DP = 5f
+
+    /**
+     * How far the chosen reaction overshoots past the focus scale when picked,
+     * before it flies down to the trigger. The one moment a raster is shown
+     * above MAX_FOCUS_SCALE — mid-motion, for a fraction of a second, where
+     * softening is invisible.
+     */
+    const val SELECTION_POP_SCALE = 1.9f
 }
 
 /** A reaction resolved to what actually gets drawn. */
@@ -98,6 +117,14 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         // them. Child order alone puts the backdrop first.
     }
 
+    /**
+     * The resting alpha of each reaction: dimmed when another reaction is the
+     * current selection. Kept so animations that temporarily change alpha (the
+     * open cascade, the selection celebration) can settle back to it rather
+     * than clobbering the dim.
+     */
+    private var baseAlphas: List<Float> = emptyList()
+
     fun apply(items: List<Renderable>, selectedId: String?) {
         renderables = items
 
@@ -107,12 +134,16 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         springs.clear()
         while (childCount > 1) removeViewAt(1)
 
-        items.forEach { renderable ->
+        baseAlphas = items.map { renderable ->
+            if (selectedId != null && renderable.id != selectedId) 0.55f else 1f
+        }
+
+        items.forEachIndexed { index, renderable ->
             val imageView = ImageView(context).apply {
                 setImageBitmap(renderable.bitmap)
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 contentDescription = renderable.accessibilityLabel
-                alpha = if (selectedId != null && renderable.id != selectedId) 0.55f else 1f
+                alpha = baseAlphas[index]
             }
             addView(imageView)
         }
@@ -120,6 +151,9 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         requestLayout()
         invalidate()
     }
+
+    private fun baseAlpha(position: Int): Float =
+        baseAlphas.getOrElse(position - 1) { 1f }
 
     /**
      * Resolution entry point shared with the host. Android renders emoji only in
@@ -179,14 +213,49 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         animation.animateToFinalPosition(target)
     }
 
+    /**
+     * Work scheduled with a delay for staggered animation. Tracked so a reopen
+     * arriving mid-flight can cancel everything still pending before reusing
+     * the views.
+     */
+    private val pendingRunnables = ArrayList<Runnable>()
+
+    private fun postStaggered(delayMs: Long, action: () -> Unit) {
+        val runnable = Runnable(action)
+        pendingRunnables.add(runnable)
+        postDelayed(runnable, delayMs)
+    }
+
+    private fun cancelInFlightAnimations() {
+        pendingRunnables.forEach { removeCallbacks(it) }
+        pendingRunnables.clear()
+        animate().cancel()
+        backdrop.animate().cancel()
+        for (position in 1 until childCount) getChildAt(position).animate().cancel()
+        springs.values.forEach { it.cancel() }
+    }
+
     /** Collapsed state, set before the picker is attached. */
     fun prepareForPresentation() {
+        // A reopen can land mid-celebration, with animations still in flight
+        // and the backdrop faded. Stop everything and restore before collapsing.
+        cancelInFlightAnimations()
+        backdrop.alpha = 1f
+        backdrop.scaleX = 1f
+        backdrop.scaleY = 1f
+        backdrop.translationY = 0f
+
         alpha = 0f
         if (reduceMotion) {
             scaleX = 1f
             scaleY = 1f
+            translationY = 0f
             for (position in 1 until childCount) {
-                getChildAt(position).apply { alpha = 1f; scaleX = 1f; scaleY = 1f }
+                getChildAt(position).apply {
+                    alpha = baseAlpha(position)
+                    scaleX = 1f; scaleY = 1f
+                    translationX = 0f; translationY = 0f
+                }
             }
             return
         }
@@ -194,8 +263,16 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         pivotY = (itemSize + contentInset * 2).toFloat()
         scaleX = 0.86f
         scaleY = 0.86f
+        translationY = 0f
         for (position in 1 until childCount) {
-            getChildAt(position).apply { alpha = 0f; scaleX = 0.4f; scaleY = 0.4f }
+            // Each reaction starts small and below its resting place, so the
+            // open reads as the row rising out of the trigger.
+            getChildAt(position).apply {
+                alpha = 0f
+                scaleX = 0.4f; scaleY = 0.4f
+                translationX = 0f
+                translationY = dp(10f).toFloat()
+            }
         }
     }
 
@@ -211,51 +288,177 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         for (position in 1 until childCount) {
             val child = getChildAt(position)
             child.animate()
-                .alpha(1f)
-                .setStartDelay((position - 1) * 25L)
-                .setDuration(140)
-                .withEndAction {
-                    spring(child, SpringAnimation.SCALE_X, 1f)
-                    spring(child, SpringAnimation.SCALE_Y, 1f)
-                }
+                .alpha(baseAlpha(position))
+                .setStartDelay((position - 1) * 30L)
+                .setDuration(150)
                 .start()
+            // The rise and the settle run as springs from the start, staggered
+            // to match the fade, so each reaction bounces up into place.
+            postStaggered((position - 1) * 30L) {
+                spring(child, SpringAnimation.SCALE_X, 1f)
+                spring(child, SpringAnimation.SCALE_Y, 1f)
+                spring(child, SpringAnimation.TRANSLATION_Y, 0f)
+            }
         }
     }
 
     fun animateOut(completion: () -> Unit) {
         animate()
             .alpha(0f)
-            .scaleX(if (reduceMotion) 1f else 0.92f)
-            .scaleY(if (reduceMotion) 1f else 0.92f)
-            .setDuration(180)
+            .scaleX(if (reduceMotion) 1f else 0.9f)
+            .scaleY(if (reduceMotion) 1f else 0.9f)
+            // Sinks back toward the trigger it grew out of — the inverse of
+            // the open — rather than shrinking in place.
+            .translationY(if (reduceMotion) 0f else dp(6f).toFloat())
+            .setDuration(200)
             .withEndAction {
-                alpha = 1f
-                scaleX = 1f
-                scaleY = 1f
+                resetAfterDismissal()
                 completion()
             }
             .start()
     }
 
-    /** Highlights the reaction under the finger. */
+    /**
+     * The selection celebration: everything that was not chosen shrinks away,
+     * staggered outward from the choice; the chosen reaction pops past its
+     * focus scale, then shrinks and flies along (flightX, flightY) — the vector
+     * from its resting position to the trigger — so the reaction reads as
+     * landing on the row that was pressed.
+     */
+    fun animateSelection(index: Int, flightX: Float, flightY: Float, completion: () -> Unit) {
+        val chosen = getChildAt(index + 1)
+        if (reduceMotion || chosen == null) {
+            animateOut(completion)
+            return
+        }
+
+        // The capsule leaves first, sinking slightly as it fades.
+        backdrop.animate()
+            .alpha(0f)
+            .scaleX(0.9f).scaleY(0.9f)
+            .translationY(dp(4f).toFloat())
+            .setStartDelay(0)
+            .setDuration(250)
+            .start()
+
+        // Non-selected reactions shrink away in a wave spreading outward from
+        // the choice, pulling the eye toward what was picked.
+        for (position in 1 until childCount) {
+            if (position == index + 1) continue
+            val child = getChildAt(position)
+            child.animate()
+                .alpha(0f)
+                .scaleX(0.3f).scaleY(0.3f)
+                .setStartDelay(abs(position - 1 - index) * 30L)
+                .setDuration(160)
+                .start()
+        }
+
+        // The choice pops past its focus scale…
+        chosen.elevation = 2f
+        spring(chosen, SpringAnimation.SCALE_X, Metrics.SELECTION_POP_SCALE,
+            damping = SpringForce.DAMPING_RATIO_HIGH_BOUNCY)
+        spring(chosen, SpringAnimation.SCALE_Y, Metrics.SELECTION_POP_SCALE,
+            damping = SpringForce.DAMPING_RATIO_HIGH_BOUNCY)
+
+        // …then flies down to the trigger. Teardown is bound to the end of this
+        // leg, matching iOS (spec §4.3).
+        postStaggered(180L) {
+            spring(chosen, SpringAnimation.SCALE_X, 0.2f,
+                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
+            spring(chosen, SpringAnimation.SCALE_Y, 0.2f,
+                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
+            spring(chosen, SpringAnimation.TRANSLATION_X, flightX,
+                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
+            spring(chosen, SpringAnimation.TRANSLATION_Y, flightY,
+                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
+            // Explicit zero delay: View.animate() reuses one animator per view,
+            // and a stagger delay from the open cascade would otherwise leak
+            // into this leg.
+            chosen.animate()
+                .alpha(0f)
+                .setStartDelay(0)
+                .setDuration(280)
+                .withEndAction {
+                    resetAfterDismissal()
+                    completion()
+                }
+                .start()
+        }
+    }
+
+    /**
+     * Puts the pooled instance back to a clean resting state after teardown, so
+     * the next open never inherits leftover transforms, alphas, or a faded
+     * backdrop.
+     */
+    private fun resetAfterDismissal() {
+        alpha = 1f
+        scaleX = 1f
+        scaleY = 1f
+        translationY = 0f
+        backdrop.alpha = 1f
+        backdrop.scaleX = 1f
+        backdrop.scaleY = 1f
+        backdrop.translationY = 0f
+        for (position in 1 until childCount) {
+            getChildAt(position).apply {
+                alpha = baseAlpha(position)
+                scaleX = 1f; scaleY = 1f
+                translationX = 0f; translationY = 0f
+                elevation = 0f
+            }
+        }
+    }
+
+    /**
+     * Highlights the reaction under the finger. Dock-style: the focused
+     * reaction rises to full scale, its immediate neighbours partially follow
+     * and step aside, and everything else settles back — so a drag across the
+     * row reads as a travelling wave rather than a binary highlight.
+     */
     fun setFocusedIndex(index: Int?) {
         for (position in 1 until childCount) {
             val child = getChildAt(position)
-            val focused = position - 1 == index
-            val scale = if (focused) Metrics.MAX_FOCUS_SCALE else 1f
-            val lift = if (focused) -dp(Metrics.FOCUS_LIFT_DP).toFloat() else 0f
+            val itemIndex = position - 1
+            val focused = itemIndex == index
+            val isNeighbor = index != null && abs(itemIndex - index) == 1
 
-            if (focused) child.elevation = 1f else child.elevation = 0f
+            val scale: Float
+            val lift: Float
+            var shift = 0f
+            when {
+                focused -> {
+                    scale = Metrics.MAX_FOCUS_SCALE
+                    lift = -dp(Metrics.FOCUS_LIFT_DP).toFloat()
+                }
+                isNeighbor -> {
+                    scale = Metrics.NEIGHBOR_SCALE
+                    lift = -dp(Metrics.NEIGHBOR_LIFT_DP).toFloat()
+                    // Pushed away from the focused item so the magnified
+                    // raster has room.
+                    val direction = if (itemIndex < index!!) -1f else 1f
+                    shift = direction * dp(Metrics.NEIGHBOR_SHIFT_DP).toFloat()
+                }
+                else -> {
+                    scale = 1f
+                    lift = 0f
+                }
+            }
+
+            child.elevation = if (focused) 2f else if (isNeighbor) 1f else 0f
 
             if (reduceMotion) {
                 child.scaleX = scale
                 child.scaleY = scale
+                child.translationX = shift
                 child.translationY = lift
                 continue
             }
             // Scale and translation only — no layout pass per frame.
             spring(child, SpringAnimation.SCALE_X, scale)
             spring(child, SpringAnimation.SCALE_Y, scale)
+            spring(child, SpringAnimation.TRANSLATION_X, shift)
             spring(child, SpringAnimation.TRANSLATION_Y, lift)
         }
     }

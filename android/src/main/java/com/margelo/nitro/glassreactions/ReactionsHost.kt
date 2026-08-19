@@ -55,6 +55,15 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private var activeTriggerId: String? = null
     private var activeItems: Array<NativeReactionItem> = emptyArray()
     private var activeRect = Rect()
+
+    /**
+     * Where the trigger was when the picker opened (screen coordinates, same
+     * space as activeRect), kept so the selection celebration can fly the
+     * chosen reaction back to it. Resolved once at gesture-begin — good
+     * enough, since scrolling is suppressed for the whole interaction.
+     */
+    private var activeTriggerCenterX = 0f
+    private var activeTriggerCenterY = 0f
     private var focusedIndex: Int? = null
     private var pendingTrigger: Pair<String, View>? = null
     private var downX = 0f
@@ -320,6 +329,8 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             left + overlayLocation[0] + width,
             top + overlayLocation[1] + height
         )
+        activeTriggerCenterX = location[0] + triggerView.width / 2f
+        activeTriggerCenterY = location[1] + triggerView.height / 2f
 
         // No initial focus: the finger is still on the row that was pressed,
         // not on a reaction.
@@ -373,18 +384,46 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
         if (!cancelled) onSelect?.invoke(triggerId, selected)
 
+        // The celebration plays on whatever was under the finger, whether that
+        // committed a new selection or cleared the existing one — either way
+        // the user chose that reaction.
+        val celebratedIndex = if (cancelled) null else focusedIndex
+        val itemCount = activeItems.size
+
         activeTriggerId = null
         activeItems = emptyArray()
         focusedIndex = null
 
         val pill = picker
-        pill?.setFocusedIndex(null)
         // Teardown is bound to animation-end, not touch-up: onSelect has fired
         // above, and detaching now would cut the collapse off (spec §4.3).
-        pill?.animateOut {
-            // Detached, not deallocated: detaching is what removes the per-frame
-            // cost; deallocating would only re-buy construction (spec §6.5).
-            (pill.parent as? ViewGroup)?.removeView(pill)
+        // Detached, not deallocated: detaching is what removes the per-frame
+        // cost; deallocating would only re-buy construction (spec §6.5).
+        val teardown: () -> Unit = { (pill?.parent as? ViewGroup)?.removeView(pill) }
+
+        if (celebratedIndex != null && itemCount > 0) {
+            // A firmer confirm than the per-item tick.
+            pill?.performHapticFeedback(
+                if (android.os.Build.VERSION.SDK_INT >= 30)
+                    HapticFeedbackConstants.CONFIRM
+                else
+                    HapticFeedbackConstants.KEYBOARD_TAP
+            )
+
+            // Vector from the chosen reaction's resting centre to the trigger's
+            // centre, both in screen coordinates.
+            val stride = activeRect.width().toFloat() / itemCount
+            val itemCenterX = activeRect.left + stride * (celebratedIndex + 0.5f)
+            val itemCenterY = activeRect.exactCenterY()
+            pill?.animateSelection(
+                celebratedIndex,
+                activeTriggerCenterX - itemCenterX,
+                activeTriggerCenterY - itemCenterY,
+                teardown
+            )
+        } else {
+            pill?.setFocusedIndex(null)
+            pill?.animateOut(teardown)
         }
 
         onClose?.invoke(triggerId)
