@@ -243,9 +243,10 @@ final class ReactionsPillView: UIView {
         continue
       }
 
-      // The focused reaction is raised above its siblings so the scaled art
-      // overlaps them rather than being drawn under the next one along.
-      if focused { bringSubviewToFront(imageView) }
+      // zPosition, not bringSubviewToFront: reordering the view hierarchy
+      // invalidates layout, layoutSubviews then reassigns this view's frame,
+      // and that cancels the transform animation the instant it starts.
+      imageView.layer.zPosition = focused ? 1 : 0
 
       // `.beginFromCurrentState` is the whole point: dragging across the row
       // retargets this animation many times per second, and without it each new
@@ -306,13 +307,20 @@ final class ReactionsPillView: UIView {
     backdrop.clipsToBounds = true
     clipsToBounds = false
 
+    // Position via bounds and center rather than frame: these views carry a
+    // scale transform while focused, and assigning `frame` to a transformed
+    // view is undefined and clobbers the running animation.
+    let size = CGSize(width: Metrics.itemSize, height: Metrics.itemSize)
     var x = Metrics.contentInset
-    let y = (bounds.height - Metrics.itemSize) / 2
 
     for imageView in imageViews {
-      imageView.frame = CGRect(
-        x: x, y: y, width: Metrics.itemSize, height: Metrics.itemSize
-      )
+      let center = CGPoint(x: x + Metrics.itemSize / 2, y: bounds.height / 2)
+      if imageView.bounds.size != size {
+        imageView.bounds = CGRect(origin: .zero, size: size)
+      }
+      if imageView.center != center {
+        imageView.center = center
+      }
       x += Metrics.itemSize + Metrics.itemSpacing
     }
   }
