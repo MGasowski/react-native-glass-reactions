@@ -56,14 +56,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MGasowski/rn-glass-reactions.git"
+    "url": "git+https://github.com/MGasowski/react-native-glass-reactions.git"
   },
   "author": "MGasowski <gasowski0marcin@gmail.com> (https://github.com/MGasowski)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/MGasowski/rn-glass-reactions/issues"
+    "url": "https://github.com/MGasowski/react-native-glass-reactions/issues"
   },
-  "homepage": "https://github.com/MGasowski/rn-glass-reactions#readme",
+  "homepage": "https://github.com/MGasowski/react-native-glass-reactions#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
