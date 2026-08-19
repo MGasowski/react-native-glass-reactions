@@ -146,7 +146,8 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": false
+      "publish": false,
+      "allowSameVersion": true
     },
     "github": {
       "release": true
