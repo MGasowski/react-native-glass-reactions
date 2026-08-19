@@ -5,15 +5,12 @@ name: Reactions example — launch and scroll arbitration
 #
 # Maestro cannot express press → hold → drag → release as one continuous
 # gesture: `longPressOn` presses *and releases*, which ends the interaction
-# before a reaction can be dragged to. Since the whole library is that one
-# gesture, the selection path is NOT covered here and needs a native UI test
-# (XCUITest / Espresso) driving raw touch events.
+# before a reaction can be dragged to. The selection path is covered by the
+# XCUITest suite in example/ios/GlassReactionsExampleUITests instead.
 #
-# What this flow does protect is the arbitration rule that spec §6.4 calls the
-# top support cost: an ordinary swipe must still scroll the list normally with
-# the host's recognizer installed. That is a real regression class — an earlier
-# revision cancelled the scroll view's pan too eagerly — and it is cheap to
-# catch here.
+# What this flow protects is the arbitration rule spec §6.4 calls the top
+# support cost: an ordinary swipe must scroll the list and must NOT open the
+# picker, with the host's recognizer installed.
 
 - launchApp:
     clearState: true
@@ -27,18 +24,27 @@ name: Reactions example — launch and scroll arbitration
 
 - assertVisible: 'Review #6'
 
-# --- A plain swipe scrolls -------------------------------------------------
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 400
+# --- Swiping scrolls -------------------------------------------------------
+# scrollUntilVisible rather than a fixed swipe plus a fixed expectation: CI
+# runs with animations disabled, so a swipe carries no fling momentum and
+# covers far fewer rows than the same gesture on a developer machine. Asserting
+# a specific row after one swipe is a test of the runner's physics, not of this
+# library.
+- scrollUntilVisible:
+    element:
+      text: 'Review #15'
+    direction: DOWN
+    timeout: 30000
 
-- assertVisible: 'Review #15'
+# --- ...and scrolling must never open the picker ---------------------------
+# Reactions are only in the hierarchy while the picker is open, so their
+# absence is the assertion that arbitration held.
+- assertNotVisible: 'Like'
+- assertNotVisible: 'Fire'
 
 # --- And scrolls back ------------------------------------------------------
-- swipe:
-    start: 50%, 25%
-    end: 50%, 80%
-    duration: 400
-
-- assertVisible: 'Review #5'
+- scrollUntilVisible:
+    element:
+      text: 'Review #5'
+    direction: UP
+    timeout: 30000
