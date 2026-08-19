@@ -64,11 +64,10 @@ final class ReactionsPillView: UIView {
   /// view below that, an opaque view under Reduce Transparency.
   private var backdrop: UIView!
 
-  /// Per-item focus animators, kept so an in-flight spring can be stopped
-  /// before a new one starts. Two animators driving the same `transform` fight,
-  /// and an interrupted one leaves the view parked at a stale scale — which
-  /// shows up as a single reaction stuck smaller than its neighbours.
-  private var focusAnimators: [Int: UIViewPropertyAnimator] = [:]
+  /// The in-flight open/close animation, kept so a long-press arriving during a
+  /// collapse can cancel it rather than letting its completion tear down a
+  /// picker that is being reused (spec §4.3).
+  private var presentationAnimator: UIViewPropertyAnimator?
 
   private var usingGlass = false
 
@@ -163,6 +162,12 @@ final class ReactionsPillView: UIView {
 
   /// Collapsed state, set before the picker is attached.
   func prepareForPresentation() {
+    // A long-press arriving mid-collapse reuses this instance. Stopping without
+    // finishing also suppresses the old completion, which would otherwise
+    // detach the picker that is being reopened.
+    presentationAnimator?.stopAnimation(true)
+    presentationAnimator = nil
+
     // Grows from the bottom edge, which is the side nearest the trigger, so the
     // expansion reads as coming out of the row rather than appearing over it.
     layer.anchorPoint = CGPoint(x: 0.5, y: 1)
@@ -187,10 +192,12 @@ final class ReactionsPillView: UIView {
       return
     }
 
-    spring(duration: 0.42, damping: 0.72) {
+    let animator = spring(duration: 0.42, damping: 0.72) {
       self.alpha = 1
       self.transform = .identity
-    }.startAnimation()
+    }
+    presentationAnimator = animator
+    animator.startAnimation()
 
     // Reactions arrive in sequence rather than all at once. The stagger is
     // small enough that the whole row is settled well inside the time it takes
@@ -211,7 +218,13 @@ final class ReactionsPillView: UIView {
         self.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
       }
     }
-    animator.addCompletion { _ in completion() }
+    animator.addCompletion { [weak self] position in
+      self?.presentationAnimator = nil
+      // Only tear down if the collapse actually ran to the end. A cancelled
+      // one means the picker was reopened and must stay attached.
+      if position == .end { completion() }
+    }
+    presentationAnimator = animator
     animator.startAnimation()
   }
 
@@ -225,15 +238,6 @@ final class ReactionsPillView: UIView {
           .translatedBy(x: 0, y: -Metrics.focusLift)
         : .identity
 
-      // Stop whatever is already animating this reaction before starting the
-      // next spring. `withoutFinishing` leaves the transform where it is, so
-      // the new spring picks up from the current position instead of two
-      // animators fighting over the same property.
-      if let running = focusAnimators[position] {
-        running.stopAnimation(true)
-        focusAnimators[position] = nil
-      }
-
       guard !reduceMotion else {
         imageView.transform = target
         continue
@@ -243,16 +247,26 @@ final class ReactionsPillView: UIView {
       // overlaps them rather than being drawn under the next one along.
       if focused { bringSubviewToFront(imageView) }
 
-      // Transform only — animating the item's frame would re-evaluate the
-      // glass effect behind it every frame (spec §6.5).
-      let animator = spring(duration: 0.3, damping: 0.58) {
+      // `.beginFromCurrentState` is the whole point: dragging across the row
+      // retargets this animation many times per second, and without it each new
+      // animation restarts from the *model* value rather than from where the
+      // reaction currently appears — which reads as a pop.
+      //
+      // A UIViewPropertyAnimator is deliberately not used here. Stopping one
+      // mid-flight to retarget leaves the model layer already at the previous
+      // target, so the view jumps there instantly before the next spring runs.
+      //
+      // Transform only — animating the item's frame would re-evaluate the glass
+      // effect behind it every frame (spec §6.5).
+      UIView.animate(
+        withDuration: 0.3,
+        delay: 0,
+        usingSpringWithDamping: 0.58,
+        initialSpringVelocity: 0,
+        options: [.beginFromCurrentState, .allowUserInteraction]
+      ) {
         imageView.transform = target
       }
-      animator.addCompletion { [weak self] _ in
-        self?.focusAnimators[position] = nil
-      }
-      focusAnimators[position] = animator
-      animator.startAnimation()
     }
   }
 

@@ -166,11 +166,16 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         damping: Float = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
     ) {
         val key = System.identityHashCode(view) to property
-        val animation = springs.getOrPut(key) { SpringAnimation(view, property) }
-        animation.cancel()
-        animation.spring = SpringForce(target)
-            .setStiffness(stiffness)
-            .setDampingRatio(damping)
+        val animation = springs.getOrPut(key) {
+            SpringAnimation(view, property).apply {
+                spring = SpringForce().setStiffness(stiffness).setDampingRatio(damping)
+            }
+        }
+        // Retarget in place rather than cancelling and restarting. cancel()
+        // leaves the value where it stopped and the next start jumps, which
+        // reads as a pop; animateToFinalPosition carries the current position
+        // and velocity into the new target.
+        animation.spring.setStiffness(stiffness).setDampingRatio(damping)
         animation.animateToFinalPosition(target)
     }
 
