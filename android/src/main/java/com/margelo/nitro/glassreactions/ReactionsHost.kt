@@ -161,11 +161,18 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private fun ensureOverlay(activity: Activity): FrameLayout? {
         overlay?.let { return it }
         val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return null
+        content.clipChildren = false
+        content.clipToPadding = false
         val layer = FrameLayout(activity).apply {
             // Presentation surface only — touches keep flowing to the app, which
             // is where the single interception point is.
             isEnabled = false
             isClickable = false
+            // The focused reaction scales past the picker's bounds, so neither
+            // the overlay nor its padding may clip it. clipChildren on the
+            // picker alone is not enough — the parent clips too.
+            clipChildren = false
+            clipToPadding = false
         }
         content.addView(
             layer,

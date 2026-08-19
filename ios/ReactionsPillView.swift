@@ -64,9 +64,11 @@ final class ReactionsPillView: UIView {
   /// view below that, an opaque view under Reduce Transparency.
   private var backdrop: UIView!
 
-  /// Container the reactions are added to — the effect view's `contentView`
-  /// on the glass and blur paths, the backdrop itself when opaque.
-  private var contentHost: UIView!
+  /// Per-item focus animators, kept so an in-flight spring can be stopped
+  /// before a new one starts. Two animators driving the same `transform` fight,
+  /// and an interrupted one leaves the view parked at a stale scale — which
+  /// shows up as a single reaction stuck smaller than its neighbours.
+  private var focusAnimators: [Int: UIViewPropertyAnimator] = [:]
 
   private var usingGlass = false
 
@@ -94,7 +96,6 @@ final class ReactionsPillView: UIView {
         let capsule = UIVisualEffectView(effect: UIGlassEffect())
         addSubview(capsule)
         backdrop = capsule
-        contentHost = capsule.contentView
         return
       }
     #endif
@@ -104,12 +105,10 @@ final class ReactionsPillView: UIView {
       solid.backgroundColor = .secondarySystemBackground
       addSubview(solid)
       backdrop = solid
-      contentHost = solid
     } else {
       let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
       addSubview(blur)
       backdrop = blur
-      contentHost = blur.contentView
     }
   }
 
@@ -140,7 +139,7 @@ final class ReactionsPillView: UIView {
       imageView.accessibilityLabel = renderable.accessibilityLabel
       imageView.accessibilityTraits = .button
 
-      contentHost.addSubview(imageView)
+      addSubview(imageView)
       imageViews.append(imageView)
     }
   }
@@ -226,15 +225,34 @@ final class ReactionsPillView: UIView {
           .translatedBy(x: 0, y: -Metrics.focusLift)
         : .identity
 
+      // Stop whatever is already animating this reaction before starting the
+      // next spring. `withoutFinishing` leaves the transform where it is, so
+      // the new spring picks up from the current position instead of two
+      // animators fighting over the same property.
+      if let running = focusAnimators[position] {
+        running.stopAnimation(true)
+        focusAnimators[position] = nil
+      }
+
       guard !reduceMotion else {
         imageView.transform = target
         continue
       }
+
+      // The focused reaction is raised above its siblings so the scaled art
+      // overlaps them rather than being drawn under the next one along.
+      if focused { bringSubviewToFront(imageView) }
+
       // Transform only — animating the item's frame would re-evaluate the
       // glass effect behind it every frame (spec §6.5).
-      spring(duration: 0.3, damping: 0.58) {
+      let animator = spring(duration: 0.3, damping: 0.58) {
         imageView.transform = target
-      }.startAnimation()
+      }
+      animator.addCompletion { [weak self] _ in
+        self?.focusAnimators[position] = nil
+      }
+      focusAnimators[position] = animator
+      animator.startAnimation()
     }
   }
 
@@ -269,9 +287,10 @@ final class ReactionsPillView: UIView {
     // layer forces an offscreen render pass (spec §6.3).
     backdrop.layer.cornerRadius = bounds.height / 2
     backdrop.layer.cornerCurve = .continuous
-    if !usingGlass {
-      backdrop.clipsToBounds = true
-    }
+    // The backdrop clips itself to the capsule; the pill must not clip, or the
+    // focused reaction is cut off as it scales past the capsule's bounds.
+    backdrop.clipsToBounds = true
+    clipsToBounds = false
 
     var x = Metrics.contentInset
     let y = (bounds.height - Metrics.itemSize) / 2

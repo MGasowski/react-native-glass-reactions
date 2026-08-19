@@ -101,7 +101,10 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     fun apply(items: List<Renderable>, selectedId: String?) {
         renderables = items
 
-        // Drop every child except the backdrop, then rebuild.
+        // Drop every child except the backdrop, then rebuild. Any springs bound
+        // to the discarded views go with them.
+        springs.values.forEach { it.cancel() }
+        springs.clear()
         while (childCount > 1) removeViewAt(1)
 
         items.forEach { renderable ->
@@ -146,6 +149,15 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
             1f
         ) == 0f
 
+    /**
+     * One animation per (view, property), reused. Starting a fresh
+     * SpringAnimation while another is still running on the same property
+     * leaves two animations fighting, and an interrupted one parks the view at
+     * a stale scale — which looks like a single reaction stuck smaller than its
+     * neighbours.
+     */
+    private val springs = HashMap<Pair<Int, DynamicAnimation.ViewProperty>, SpringAnimation>()
+
     private fun spring(
         view: View,
         property: DynamicAnimation.ViewProperty,
@@ -153,11 +165,13 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         stiffness: Float = SpringForce.STIFFNESS_MEDIUM,
         damping: Float = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
     ) {
-        SpringAnimation(view, property).apply {
-            this.spring = SpringForce(target)
-                .setStiffness(stiffness)
-                .setDampingRatio(damping)
-        }.start()
+        val key = System.identityHashCode(view) to property
+        val animation = springs.getOrPut(key) { SpringAnimation(view, property) }
+        animation.cancel()
+        animation.spring = SpringForce(target)
+            .setStiffness(stiffness)
+            .setDampingRatio(damping)
+        animation.animateToFinalPosition(target)
     }
 
     /** Collapsed state, set before the picker is attached. */
@@ -225,6 +239,8 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
             val focused = position - 1 == index
             val scale = if (focused) Metrics.MAX_FOCUS_SCALE else 1f
             val lift = if (focused) -dp(Metrics.FOCUS_LIFT_DP).toFloat() else 0f
+
+            if (focused) child.elevation = 1f else child.elevation = 0f
 
             if (reduceMotion) {
                 child.scaleX = scale
