@@ -192,3 +192,22 @@ xcrun xctrace record --device <udid> --template 'Animation Hitches' \
 Attach by **PID**, not by process name — attaching by name fails and, unhelpfully, `xctrace` still exits 0 while producing no trace. Get the PID from `xcrun devicectl device info processes --device <udid> | grep GlassReactions`.
 
 An empty `hitches-frame-lifetimes` table means the app rendered nothing during the window, not that it rendered perfectly.
+
+## Verifying the Expo config plugin
+
+The example app is bare React Native, so nothing in the normal build path
+exercises the plugin. Two checks cover it, both run by `yarn lint`:
+
+- `scripts/check-plugin.mjs` — the transformation and the `app.plugin.js` entry
+  point in isolation. Guards the key name, that unrelated `Info.plist` keys
+  survive, and that an explicit `false` is overridden.
+- `scripts/check-plugin-prebuild.mjs` — the plugin through Expo's real mod
+  pipeline via `compileModsAsync` in introspection mode, the same machinery
+  behind `expo config --type introspect`. No Xcode and no native project needed.
+
+If you change the plugin, confirm the checks still *fail* when you break it —
+flip the key to `false`, run them, and expect a non-zero exit. A check that
+cannot fail is worthless.
+
+Not covered: a real `expo prebuild` against a genuine project. That needs an
+Expo example app, which does not exist yet.
