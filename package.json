@@ -46,7 +46,8 @@
     "check:glass-guards": "node scripts/check-glass-guards.mjs",
     "ab:control": "sed -i '' 's/TRIGGERS_ENABLED = true/TRIGGERS_ENABLED = false/' example/src/ab-config.ts",
     "ab:restore": "sed -i '' 's/TRIGGERS_ENABLED = false/TRIGGERS_ENABLED = true/' example/src/ab-config.ts",
-    "check:plugin": "yarn build:plugin && node scripts/check-plugin.mjs && node scripts/check-plugin-prebuild.mjs"
+    "check:plugin": "yarn build:plugin && node scripts/check-plugin.mjs && node scripts/check-plugin-prebuild.mjs",
+    "release": "release-it"
   },
   "keywords": [
     "react-native",
@@ -55,14 +56,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MGasowski/react-native-glass-reactions.git"
+    "url": "git+https://github.com/MGasowski/rn-glass-reactions.git"
   },
   "author": "MGasowski <gasowski0marcin@gmail.com> (https://github.com/MGasowski)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/MGasowski/react-native-glass-reactions/issues"
+    "url": "https://github.com/MGasowski/rn-glass-reactions/issues"
   },
-  "homepage": "https://github.com/MGasowski/react-native-glass-reactions#readme",
+  "homepage": "https://github.com/MGasowski/rn-glass-reactions#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -73,6 +74,7 @@
     "@expo/config-plugins": "^57.0.8",
     "@react-native/babel-preset": "0.85.0",
     "@react-native/eslint-config": "0.85.0",
+    "@release-it/conventional-changelog": "^12.0.0",
     "@types/react": "^19.2.0",
     "del-cli": "^7.0.0",
     "eslint": "^9.39.4",
@@ -85,6 +87,7 @@
     "react-native": "0.85.0",
     "react-native-builder-bob": "^0.43.0",
     "react-native-nitro-modules": "^0.36.5",
+    "release-it": "^21.0.2",
     "turbo": "^2.9.16",
     "typescript": "^6.0.3"
   },
@@ -136,5 +139,23 @@
       "eslint"
     ],
     "version": "0.63.0"
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore: release ${version}",
+      "tagName": "v${version}"
+    },
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": "angular",
+        "infile": "CHANGELOG.md"
+      }
+    }
   }
 }

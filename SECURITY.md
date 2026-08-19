@@ -8,7 +8,7 @@ Security fixes land on the latest minor of the current major only. See the suppo
 
 Please **do not** open a public issue.
 
-Report privately through [GitHub Security Advisories](https://github.com/MGasowski/react-native-glass-reactions/security/advisories/new). If that is unavailable to you, email the address on the maintainer's GitHub profile.
+Report privately through [GitHub Security Advisories](https://github.com/MGasowski/rn-glass-reactions/security/advisories/new). If that is unavailable to you, email the address on the maintainer's GitHub profile.
 
 Include the library version, React Native and Nitro versions, the platform and OS version, and enough detail to reproduce.
 
