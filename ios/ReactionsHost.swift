@@ -12,6 +12,10 @@ private struct TriggerRegistration {
 private enum Layout {
   /// Gap between the top of the trigger and the bottom of the picker.
   static let verticalOffset: CGFloat = 8
+
+  /// How far outside the picker the finger may stray and still count as
+  /// pointing at a reaction. Moving further clears the selection.
+  static let focusTolerance: CGFloat = 12
   static let screenMargin: CGFloat = 12
 }
 
@@ -285,18 +289,22 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // has first-fire latency that breaks frame alignment (spec §6.5).
     haptics?.prepare()
 
+    // Deliberately no initial focus: at this instant the finger is on the row
+    // that was pressed, not on a reaction. Focusing here is what made a
+    // reaction appear pre-selected the moment the picker opened.
     focusedIndex = nil
-    updateFocus(at: point)
+    pickerView?.setFocusedIndex(nil)
 
     onOpen?(triggerId)
   }
 
   private func index(at point: CGPoint) -> Int? {
     guard !activeItems.isEmpty else { return nil }
-    // Vertical slack: once open, the finger is allowed to wander above and
-    // below the row without losing the selection.
-    let slack: CGFloat = 60
-    let hitArea = activePickerFrame.insetBy(dx: 0, dy: -slack)
+    // Just enough tolerance to stop the selection flickering at the edge, not
+    // enough to keep selecting from well outside the picker. The press that
+    // opens the picker lands on the row below it, so generous slack here means
+    // a reaction is selected before the finger has gone anywhere near one.
+    let hitArea = activePickerFrame.insetBy(dx: 0, dy: -Layout.focusTolerance)
     guard hitArea.contains(point) else { return nil }
 
     let localX = point.x - activePickerFrame.minX

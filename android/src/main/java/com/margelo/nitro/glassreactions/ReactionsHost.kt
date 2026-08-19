@@ -61,6 +61,9 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private var downY = 0f
     private var touchSlop = 0
 
+    /** Tolerance around the picker before the selection is cleared. */
+    private var focusTolerancePx = 0
+
     private val openRunnable = Runnable { openPicker() }
 
     override val isLiquidGlassSupported: Boolean
@@ -150,6 +153,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         val window = activity.window ?: return
 
         touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
+        focusTolerancePx = (12 * activity.resources.displayMetrics.density).toInt()
         originalCallback = window.callback
         wrappedActivity = activity
         window.callback = TouchInterceptor(window.callback, ::handleTouch)
@@ -317,14 +321,21 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             top + overlayLocation[1] + height
         )
 
+        // No initial focus: the finger is still on the row that was pressed,
+        // not on a reaction.
         focusedIndex = null
+        pill.setFocusedIndex(null)
         pendingTrigger = null
         onOpen?.invoke(triggerId)
     }
 
     private fun indexAt(x: Float, y: Float): Int? {
         if (activeItems.isEmpty()) return null
-        val slack = 160
+        // Just enough tolerance to stop the selection flickering at the edge,
+        // not enough to keep selecting from well outside the picker. This was
+        // 160px — roughly a centimetre — which selected reactions from far
+        // below the picker.
+        val slack = focusTolerancePx
         if (x < activeRect.left || x > activeRect.right) return null
         if (y < activeRect.top - slack || y > activeRect.bottom + slack) return null
         val stride = activeRect.width().toFloat() / activeItems.size
