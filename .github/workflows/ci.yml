@@ -16,7 +16,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded branch runs are worth cancelling; a tag run is not. A tag run is
+  # the publish, and cancelling it half way leaves a tag and a GitHub release
+  # with nothing on npm.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   lint:
