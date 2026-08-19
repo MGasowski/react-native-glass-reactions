@@ -207,7 +207,7 @@ Instead, **one recognizer lives on the host**, installed above the list, and hit
 
 Detaching already buys the entire GPU saving; deallocating buys only the memory of a single view and charges full construction of the glass container to every long-press — landing directly on the latency-critical moment the user is waiting on. So: **detach on close, retain the instance in the host, warm it once at host mount off the critical path.** Never hidden via opacity (§6.3 — that disables the effect outright).
 
-> *Open for the owner to overrule:* the stated preference was to destroy the picker on touch release. The lifecycle above is behaviourally identical from the consumer's point of view — one picker, absent while scrolling — and differs only in whether the host keeps the object around to reuse. Measure both in M3 before deciding, but the expectation is that true teardown shows up as first-frame jank on every open.
+> *Resolved (2026-08-19):* the stated preference was to destroy the picker on touch release. The lifecycle above is behaviourally identical from the consumer's point of view — one picker, absent while scrolling — and differs only in whether the host keeps the object around to reuse. Shipped pooled; the owner accepted the resulting performance without requiring the A/B, so the comparison was dropped rather than run.
 
 **Animate transforms, not geometry.** Animating `bounds`/`frame` on a blurred layer re-evaluates the effect every frame. Drive expand/collapse with transform and let `UIGlassContainerEffect` own the merge/separate geometry natively; do not hand-animate the union.
 
@@ -242,6 +242,12 @@ variance, and on two of the four metrics the arm *with* triggers measured
 better. Three independent runs of the triggers-on arm gave 2163/2164/2235
 frames and 0 hitches each, so the measurement is repeatable rather than a lucky
 sample.
+
+**Owner acceptance (2026-08-19):** performance judged good enough on the tested
+hardware, so the pooled-vs-deallocated A/B originally required by §6.5 is
+**dropped rather than deferred**. The pooled lifecycle stays as implemented. If
+first-open latency is ever reported as a problem, that experiment is the place
+to start: build a variant that deallocates on close and compare time-to-visible.
 
 Two things this does *not* say, and should not be read as saying:
 
@@ -347,7 +353,7 @@ Do not attempt a full RN version matrix. Pin a documented minimum and the latest
 | M0 | Scaffold | Nitro template builds on both platforms in CI | **Done** — both example apps build locally; CI workflow present |
 | M1 | Static glass view | Glass pill renders on iOS 26; plain view fallback elsewhere; no crash | **Done** — verified on iOS 26.5 and Android |
 | M2 | Host + gesture arbitration | Single-instance host, portal presentation, trigger registration, one host-owned recognizer; opens and selects correctly inside a scrolling FlashList on both platforms | **Done** — verified on a 1000-row `FlatList` on both platforms; open, drag, select, deselect, and plain-scroll all correct. `FlashList` itself untested |
-| M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; picker lifecycle (§6.5) measured pooled vs. deallocated; profiled clean in Instruments | **Partial** — springs, stagger, focus, haptics and Reduce Motion shipped. **Instruments pass and the pooled-vs-deallocated measurement are outstanding and need a real device** |
+| M3 | Animation & haptics | Expand/collapse tuned; haptics frame-aligned; Reduce Motion respected; profiled clean in Instruments | **Done** — springs, stagger, focus, haptics and Reduce Motion shipped; profiled clean on device (§6.6). Owner accepted the feel and performance on 2026-08-19 |
 | M4 | Android parity | Defined fallback appearance and interaction shipped | **Done** — flat translucent capsule, light/dark aware, full interaction. Material Symbols deferred: emoji only on Android in 1.0 |
 | M5 | Scale validation | 1k-row list scrolls indistinguishably from the same list without triggers; §6.5 acceptance gate met on the oldest supported device | **Met on iPhone 12 Pro** — see §6.6. The delta is within run-to-run variance and negative on two of four metrics. Not yet re-checked on a ProMotion device |
 | M6 | OSS hardening | Config plugin, docs, E2E, support matrix, issue templates | **Done** — config plugin verified through Expo's own mod pipeline, README + support matrix, SECURITY, CONTRIBUTING, issue-template fields, glass-guard check, Maestro flow, and on-device XCUITests covering the core gesture. Remaining Expo gap is narrow: no `expo prebuild` against a real project, which needs an Expo example app |
