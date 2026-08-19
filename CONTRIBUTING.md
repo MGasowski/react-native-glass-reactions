@@ -233,5 +233,41 @@ yarn release 0.1.0
 Left to itself release-it reads the `feat:` commits in the history and proposes
 `0.2.0`, because it assumes `0.1.0` has already shipped.
 
-Publishing needs an `NPM_TOKEN` repository secret, and provenance additionally
-needs the workflow to run from a public repo with `id-token: write`.
+Before the tag can publish anything, the `NPM_TOKEN` repository secret has to
+exist. This is a one-time setup:
+
+1. Create an npmjs.com account and **verify the email address** — npm refuses to
+   publish from an unverified account.
+2. On npmjs.com, create a **granular access token** with read *and write*
+   permission and an expiry. For the *first* release it must be scoped to **all
+   packages**: a package-scoped token can only select packages that already
+   exist, and `react-native-glass-reactions` does not exist on the registry
+   until the first publish creates it.
+3. `gh secret set NPM_TOKEN` and paste the token.
+4. **After `0.1.0` is on npm**, replace that token with one scoped to just
+   `react-native-glass-reactions`, or move to trusted publishing (below) and
+   delete the secret. Until then the secret can write to every package the
+   account owns.
+
+There is no step where the package gets created on npmjs.com by hand. The
+registry creates it from `package.json` on the first successful publish, which
+is also what claims the name.
+
+Provenance additionally needs the workflow to run from a public repo with
+`id-token: write`, which the `release` job already declares.
+
+Do not run `npm publish` from a laptop. The release job pins the publish to a
+build whose inputs are the tagged commit, which is the whole point of the
+provenance attestation; a local publish silently produces an unattested tarball.
+
+### Switching to trusted publishing
+
+Trusted publishing (OIDC) would remove the `NPM_TOKEN` secret entirely, but npm
+can only link a package that already exists — so it is not an option for the
+first release. Once `0.1.0` is on npm, it is worth doing:
+
+1. On `https://www.npmjs.com/package/react-native-glass-reactions/access`, under
+   **Publishing access**, add this repository and the `CI` workflow.
+2. Drop the `NODE_AUTH_TOKEN` env block and the `--provenance` flag from the
+   publish step — npm generates provenance automatically for trusted publishes.
+3. Delete the `NPM_TOKEN` secret.
