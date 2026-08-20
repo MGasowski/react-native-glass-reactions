@@ -46,6 +46,14 @@ private object Metrics {
     const val NEIGHBOR_SHIFT_DP = 5f
 
     /**
+     * The divider between the consumer's reactions and the "another reaction"
+     * section (custom pick + plus): a hairline with a gap either side. Extra
+     * width it adds over a normal inter-item gap.
+     */
+    const val SEPARATOR_LINE_DP = 1f
+    const val SEPARATOR_GAP_DP = 8f
+
+    /**
      * How far the chosen reaction overshoots past the focus scale when picked,
      * before it flies down to the trigger. The one moment a raster is shown
      * above MAX_FOCUS_SCALE — mid-motion, for a fraction of a second, where
@@ -71,10 +79,69 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     private val backdrop = View(context)
     private var renderables: List<Renderable> = emptyList()
 
+    /**
+     * The reaction views, tracked explicitly rather than recovered from child
+     * indices — the child list is no longer items-only now that a separator
+     * can be present.
+     */
+    private val itemViews = ArrayList<ImageView>()
+
+    /** Index of the first item after the section divider; null for none. */
+    private var separatorAfter: Int? = null
+
+    private val separatorExtra: Int
+        get() = dp(Metrics.SEPARATOR_GAP_DP) * 2 + dp(Metrics.SEPARATOR_LINE_DP)
+            .coerceAtLeast(1) - itemSpacing
+
+    private val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /**
+     * Whether the surface the pill floats over is dark. The picker sits above
+     * arbitrary app content, so the system theme says nothing about what is
+     * actually behind it — the host samples the trigger's backing colours and
+     * sets this before each open. Null falls back to the system theme.
+     */
+    private var surfaceDark: Boolean? = null
+
+    private val isDarkAppearance: Boolean
+        get() = surfaceDark ?: ((context.resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES)
+
+    fun setSurfaceAppearance(dark: Boolean) {
+        if (surfaceDark == dark) return
+        surfaceDark = dark
+        applyBackdrop()
+        invalidate()
+    }
+
     init {
         clipChildren = false
+        // The ViewGroup draws the separator hairline itself: a child view
+        // would shift every index-based animation loop, a drawn line shifts
+        // nothing.
+        setWillNotDraw(false)
         addView(backdrop)
         applyBackdrop()
+    }
+
+    // MARK: Slot geometry
+
+    /**
+     * Centre of slot `index` in the pill's own coordinates. Single source of
+     * truth for layout, hit-testing, and the selection flight vector — slots
+     * are not uniform once the separator inserts its extra width.
+     */
+    fun slotCenterX(index: Int): Float {
+        var x = contentInset + index * (itemSize + itemSpacing) + itemSize / 2f
+        val after = separatorAfter
+        if (after != null && index >= after) x += separatorExtra
+        return x
+    }
+
+    /** The slot nearest the given local x, clamped to the row. */
+    fun slotIndex(localX: Float): Int? {
+        if (renderables.isEmpty()) return null
+        return renderables.indices.minByOrNull { abs(localX - slotCenterX(it)) }
     }
 
     private fun dp(value: Float): Int =
@@ -93,8 +160,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
      * a flat translucent surface rather than an imitation of glass.
      */
     private fun applyBackdrop() {
-        val night = (context.resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val night = isDarkAppearance
 
         val fill = if (night) {
             Color.argb(0xF0, 0x2C, 0x2C, 0x2E)
@@ -125,14 +191,16 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
      */
     private var baseAlphas: List<Float> = emptyList()
 
-    fun apply(items: List<Renderable>, selectedId: String?) {
+    fun apply(items: List<Renderable>, selectedId: String?, separatorAfter: Int?) {
         renderables = items
+        this.separatorAfter = separatorAfter
 
-        // Drop every child except the backdrop, then rebuild. Any springs bound
-        // to the discarded views go with them.
+        // Drop every item view, then rebuild. Any springs bound to the
+        // discarded views go with them.
         springs.values.forEach { it.cancel() }
         springs.clear()
-        while (childCount > 1) removeViewAt(1)
+        itemViews.forEach { removeView(it) }
+        itemViews.clear()
 
         baseAlphas = items.map { renderable ->
             if (selectedId != null && renderable.id != selectedId) 0.55f else 1f
@@ -146,14 +214,14 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
                 alpha = baseAlphas[index]
             }
             addView(imageView)
+            itemViews.add(imageView)
         }
 
         requestLayout()
         invalidate()
     }
 
-    private fun baseAlpha(position: Int): Float =
-        baseAlphas.getOrElse(position - 1) { 1f }
+    private fun baseAlpha(index: Int): Float = baseAlphas.getOrElse(index) { 1f }
 
     /**
      * Resolution entry point shared with the host. Android renders emoji only in
@@ -164,12 +232,39 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     fun applyItems(
         items: Array<NativeReactionItem>,
         selectedId: String?,
-        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode
+        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode,
+        customEmoji: String?,
+        showPlus: Boolean
     ) {
-        apply(
-            items.map { Renderable(it.id, rasteriseEmoji(it.emoji), it.accessibilityLabel) },
-            selectedId
-        )
+        val renderables = items.map {
+            Renderable(it.id, rasteriseEmoji(it.emoji), it.accessibilityLabel)
+        }.toMutableList()
+        if (showPlus) {
+            // The custom pick's id is the emoji itself — it exists in no item
+            // list, so the emoji is the only stable identity it has.
+            if (!customEmoji.isNullOrEmpty()) {
+                renderables.add(
+                    Renderable(customEmoji, rasteriseEmoji(customEmoji), customEmoji)
+                )
+            }
+            // The plus is chrome, not a reaction: drawn rather than an emoji, so
+            // it reads as part of the picker instead of one more choice.
+            renderables.add(
+                Renderable(ANOTHER_REACTION_ID, rasterisePlus(), "Add another reaction")
+            )
+        }
+        // Divider between the consumer's reactions and the "another reaction"
+        // section, drawn only when both sides exist.
+        val separatorAfter = if (showPlus && items.isNotEmpty()) items.size else null
+        apply(renderables, selectedId, separatorAfter)
+    }
+
+    companion object {
+        /**
+         * Synthetic id carried by the trailing "another reaction" plus item.
+         * Never reported through onSelect — releasing on it opens the picker.
+         */
+        const val ANOTHER_REACTION_ID = "__another_reaction__"
     }
 
     /**
@@ -231,7 +326,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         pendingRunnables.clear()
         animate().cancel()
         backdrop.animate().cancel()
-        for (position in 1 until childCount) getChildAt(position).animate().cancel()
+        itemViews.forEach { it.animate().cancel() }
         springs.values.forEach { it.cancel() }
     }
 
@@ -250,12 +345,10 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
             scaleX = 1f
             scaleY = 1f
             translationY = 0f
-            for (position in 1 until childCount) {
-                getChildAt(position).apply {
-                    alpha = baseAlpha(position)
-                    scaleX = 1f; scaleY = 1f
-                    translationX = 0f; translationY = 0f
-                }
+            itemViews.forEachIndexed { index, view ->
+                view.alpha = baseAlpha(index)
+                view.scaleX = 1f; view.scaleY = 1f
+                view.translationX = 0f; view.translationY = 0f
             }
             return
         }
@@ -264,15 +357,13 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         scaleX = 0.86f
         scaleY = 0.86f
         translationY = 0f
-        for (position in 1 until childCount) {
+        itemViews.forEach { view ->
             // Each reaction starts small and below its resting place, so the
             // open reads as the row rising out of the trigger.
-            getChildAt(position).apply {
-                alpha = 0f
-                scaleX = 0.4f; scaleY = 0.4f
-                translationX = 0f
-                translationY = dp(10f).toFloat()
-            }
+            view.alpha = 0f
+            view.scaleX = 0.4f; view.scaleY = 0.4f
+            view.translationX = 0f
+            view.translationY = dp(10f).toFloat()
         }
     }
 
@@ -285,16 +376,15 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         spring(this, SpringAnimation.SCALE_X, 1f)
         spring(this, SpringAnimation.SCALE_Y, 1f)
 
-        for (position in 1 until childCount) {
-            val child = getChildAt(position)
+        itemViews.forEachIndexed { index, child ->
             child.animate()
-                .alpha(baseAlpha(position))
-                .setStartDelay((position - 1) * 30L)
+                .alpha(baseAlpha(index))
+                .setStartDelay(index * 30L)
                 .setDuration(150)
                 .start()
             // The rise and the settle run as springs from the start, staggered
             // to match the fade, so each reaction bounces up into place.
-            postStaggered((position - 1) * 30L) {
+            postStaggered(index * 30L) {
                 spring(child, SpringAnimation.SCALE_X, 1f)
                 spring(child, SpringAnimation.SCALE_Y, 1f)
                 spring(child, SpringAnimation.TRANSLATION_Y, 0f)
@@ -319,14 +409,15 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     }
 
     /**
-     * The selection celebration: everything that was not chosen shrinks away,
-     * staggered outward from the choice; the chosen reaction pops past its
-     * focus scale, then shrinks and flies along (flightX, flightY) — the vector
-     * from its resting position to the trigger — so the reaction reads as
-     * landing on the row that was pressed.
+     * The selection celebration — a stamp: everything that was not chosen
+     * shrinks away, staggered outward from the choice; the chosen reaction
+     * pops past its focus scale, then presses back down in place and fades —
+     * like a stamp lifting off the row. No flight across the screen: the
+     * consumer's own UI reflects the selection at the same moment, and an
+     * emoji streaking from picker to row read as a glitch.
      */
-    fun animateSelection(index: Int, flightX: Float, flightY: Float, completion: () -> Unit) {
-        val chosen = getChildAt(index + 1)
+    fun animateSelection(index: Int, completion: () -> Unit) {
+        val chosen = itemViews.getOrNull(index)
         if (reduceMotion || chosen == null) {
             animateOut(completion)
             return
@@ -343,16 +434,18 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
 
         // Non-selected reactions shrink away in a wave spreading outward from
         // the choice, pulling the eye toward what was picked.
-        for (position in 1 until childCount) {
-            if (position == index + 1) continue
-            val child = getChildAt(position)
+        itemViews.forEachIndexed { itemIndex, child ->
+            if (itemIndex == index) return@forEachIndexed
             child.animate()
                 .alpha(0f)
                 .scaleX(0.3f).scaleY(0.3f)
-                .setStartDelay(abs(position - 1 - index) * 30L)
+                .setStartDelay(abs(itemIndex - index) * 30L)
                 .setDuration(160)
                 .start()
         }
+        // The divider is chrome like the capsule, so it leaves with it.
+        separatorVisible = false
+        invalidate()
 
         // The choice pops past its focus scale…
         chosen.elevation = 2f
@@ -361,16 +454,12 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         spring(chosen, SpringAnimation.SCALE_Y, Metrics.SELECTION_POP_SCALE,
             damping = SpringForce.DAMPING_RATIO_HIGH_BOUNCY)
 
-        // …then flies down to the trigger. Teardown is bound to the end of this
-        // leg, matching iOS (spec §4.3).
+        // …then presses back down in place and fades, like a stamp lifting
+        // off. Teardown is bound to the end of this leg, matching iOS (§4.3).
         postStaggered(180L) {
-            spring(chosen, SpringAnimation.SCALE_X, 0.2f,
+            spring(chosen, SpringAnimation.SCALE_X, 1f,
                 damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
-            spring(chosen, SpringAnimation.SCALE_Y, 0.2f,
-                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
-            spring(chosen, SpringAnimation.TRANSLATION_X, flightX,
-                damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
-            spring(chosen, SpringAnimation.TRANSLATION_Y, flightY,
+            spring(chosen, SpringAnimation.SCALE_Y, 1f,
                 damping = SpringForce.DAMPING_RATIO_NO_BOUNCY)
             // Explicit zero delay: View.animate() reuses one animator per view,
             // and a stagger delay from the open cascade would otherwise leak
@@ -378,7 +467,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
             chosen.animate()
                 .alpha(0f)
                 .setStartDelay(0)
-                .setDuration(280)
+                .setDuration(220)
                 .withEndAction {
                     resetAfterDismissal()
                     completion()
@@ -401,13 +490,13 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         backdrop.scaleX = 1f
         backdrop.scaleY = 1f
         backdrop.translationY = 0f
-        for (position in 1 until childCount) {
-            getChildAt(position).apply {
-                alpha = baseAlpha(position)
-                scaleX = 1f; scaleY = 1f
-                translationX = 0f; translationY = 0f
-                elevation = 0f
-            }
+        separatorVisible = true
+        invalidate()
+        itemViews.forEachIndexed { index, view ->
+            view.alpha = baseAlpha(index)
+            view.scaleX = 1f; view.scaleY = 1f
+            view.translationX = 0f; view.translationY = 0f
+            view.elevation = 0f
         }
     }
 
@@ -418,9 +507,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
      * row reads as a travelling wave rather than a binary highlight.
      */
     fun setFocusedIndex(index: Int?) {
-        for (position in 1 until childCount) {
-            val child = getChildAt(position)
-            val itemIndex = position - 1
+        itemViews.forEachIndexed { itemIndex, child ->
             val focused = itemIndex == index
             val isNeighbor = index != null && abs(itemIndex - index) == 1
 
@@ -453,7 +540,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
                 child.scaleY = scale
                 child.translationX = shift
                 child.translationY = lift
-                continue
+                return@forEachIndexed
             }
             // Scale and translation only — no layout pass per frame.
             spring(child, SpringAnimation.SCALE_X, scale)
@@ -463,10 +550,14 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         }
     }
 
+    /** Cleared during the selection celebration so the divider leaves with the capsule. */
+    private var separatorVisible = true
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val count = renderables.size
-        val width = if (count == 0) 0 else
+        var width = if (count == 0) 0 else
             count * itemSize + max(0, count - 1) * itemSpacing + contentInset * 2
+        if (count > 0 && separatorAfter != null) width += separatorExtra
         val height = itemSize + contentInset * 2
         setMeasuredDimension(
             resolveSize(width, widthMeasureSpec),
@@ -481,14 +572,35 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         backdrop.layout(0, 0, width, height)
         (backdrop.background as? GradientDrawable)?.cornerRadius = height / 2f
 
-        var x = contentInset
         val y = (height - itemSize) / 2
 
-        // Child 0 is the backdrop; reaction views follow in order.
-        for (index in 1 until childCount) {
-            getChildAt(index).layout(x, y, x + itemSize, y + itemSize)
-            x += itemSize + itemSpacing
+        itemViews.forEachIndexed { index, view ->
+            val left = (slotCenterX(index) - itemSize / 2f).toInt()
+            view.layout(left, y, left + itemSize, y + itemSize)
         }
+    }
+
+    // dispatchDraw, not onDraw: children (the backdrop capsule included) paint
+    // after onDraw and would cover the line.
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        val after = separatorAfter ?: return
+        if (!separatorVisible) return
+
+        separatorPaint.color =
+            if (isDarkAppearance) Color.argb(0x40, 0xFF, 0xFF, 0xFF)
+            else Color.argb(0x40, 0x00, 0x00, 0x00)
+
+        // Centred in the widened gap before the first "another reaction" slot.
+        val lineWidth = dp(Metrics.SEPARATOR_LINE_DP).coerceAtLeast(1).toFloat()
+        val lineX = slotCenterX(after) - itemSize / 2f -
+            dp(Metrics.SEPARATOR_GAP_DP) - lineWidth / 2f
+        val lineHeight = itemSize * 0.6f
+        val top = (this.height - lineHeight) / 2f
+        canvas.drawRoundRect(
+            lineX - lineWidth / 2f, top, lineX + lineWidth / 2f, top + lineHeight,
+            lineWidth / 2f, lineWidth / 2f, separatorPaint
+        )
     }
 
     /** Emoji are drawn once into a bitmap and reused (spec §6.5). */
@@ -506,6 +618,28 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         val metrics = paint.fontMetrics
         val baseline = side / 2f - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(value, side / 2f, baseline, paint)
+        return bitmap
+    }
+
+    /**
+     * The plus glyph for the "another reaction" item, drawn with strokes rather
+     * than rasterised from a font so its weight and colour are controlled —
+     * matching the semibold SF Symbol used on iOS.
+     */
+    private fun rasterisePlus(): Bitmap {
+        val side = (itemSize * Metrics.MAX_FOCUS_SCALE).toInt().coerceAtLeast(1)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isDarkAppearance) Color.WHITE else Color.argb(0xFF, 0x1C, 0x1C, 0x1E)
+            strokeWidth = side * 0.09f
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val center = side / 2f
+        val arm = side * 0.22f
+        canvas.drawLine(center - arm, center, center + arm, center, paint)
+        canvas.drawLine(center, center - arm, center, center + arm, paint)
         return bitmap
     }
 }

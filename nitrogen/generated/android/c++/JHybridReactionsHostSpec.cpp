@@ -22,6 +22,7 @@ namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 #include <functional>
 #include "JFunc_void_std__string_std__optional_std__string_.hpp"
 #include <NitroModules/JNICallable.hpp>
+#include "JFunc_void_std__string_std__string.hpp"
 #include "JFunc_void_std__string.hpp"
 
 namespace margelo::nitro::glassreactions {
@@ -61,16 +62,16 @@ namespace margelo::nitro::glassreactions {
   }
 
   // Methods
-  void JHybridReactionsHostSpec::activate(ReactionRenderMode renderMode, double longPressDurationMs) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JReactionRenderMode> /* renderMode */, double /* longPressDurationMs */)>("activate");
-    method(_javaPart, JReactionRenderMode::fromCpp(renderMode), longPressDurationMs);
+  void JHybridReactionsHostSpec::activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JReactionRenderMode> /* renderMode */, double /* longPressDurationMs */, jboolean /* anotherReactionEnabled */)>("activate");
+    method(_javaPart, JReactionRenderMode::fromCpp(renderMode), longPressDurationMs, anotherReactionEnabled);
   }
   void JHybridReactionsHostSpec::deactivate() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("deactivate");
     method(_javaPart);
   }
-  void JHybridReactionsHostSpec::registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, double /* viewTag */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */)>("registerTrigger");
+  void JHybridReactionsHostSpec::registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, double /* viewTag */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */, jni::alias_ref<jni::JBoolean> /* anotherReaction */, jni::alias_ref<jni::JString> /* anotherSelected */)>("registerTrigger");
     method(_javaPart, jni::make_jstring(triggerId), viewTag, [&](auto&& __input) {
       size_t __size = __input.size();
       jni::local_ref<jni::JArrayClass<JNativeReactionItem>> __array = jni::JArrayClass<JNativeReactionItem>::newArray(__size);
@@ -80,10 +81,10 @@ namespace margelo::nitro::glassreactions {
         __array->setElement(__i, *__elementJni);
       }
       return __array;
-    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr);
+    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr, anotherReaction.has_value() ? jni::JBoolean::valueOf(anotherReaction.value()) : nullptr, anotherSelected.has_value() ? jni::make_jstring(anotherSelected.value()) : nullptr);
   }
-  void JHybridReactionsHostSpec::updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */)>("updateTrigger");
+  void JHybridReactionsHostSpec::updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */, jni::alias_ref<jni::JBoolean> /* anotherReaction */, jni::alias_ref<jni::JString> /* anotherSelected */)>("updateTrigger");
     method(_javaPart, jni::make_jstring(triggerId), [&](auto&& __input) {
       size_t __size = __input.size();
       jni::local_ref<jni::JArrayClass<JNativeReactionItem>> __array = jni::JArrayClass<JNativeReactionItem>::newArray(__size);
@@ -93,7 +94,7 @@ namespace margelo::nitro::glassreactions {
         __array->setElement(__i, *__elementJni);
       }
       return __array;
-    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr);
+    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr, anotherReaction.has_value() ? jni::JBoolean::valueOf(anotherReaction.value()) : nullptr, anotherSelected.has_value() ? jni::make_jstring(anotherSelected.value()) : nullptr);
   }
   void JHybridReactionsHostSpec::unregisterTrigger(const std::string& triggerId) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */)>("unregisterTrigger");
@@ -102,6 +103,10 @@ namespace margelo::nitro::glassreactions {
   void JHybridReactionsHostSpec::setOnSelect(const std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__string_std__optional_std__string_::javaobject> /* callback */)>("setOnSelect_cxx");
     method(_javaPart, JFunc_void_std__string_std__optional_std__string__cxx::fromCpp(callback));
+  }
+  void JHybridReactionsHostSpec::setOnSelectAnother(const std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__string_std__string::javaobject> /* callback */)>("setOnSelectAnother_cxx");
+    method(_javaPart, JFunc_void_std__string_std__string_cxx::fromCpp(callback));
   }
   void JHybridReactionsHostSpec::setOnOpen(const std::function<void(const std::string& /* triggerId */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__string::javaobject> /* callback */)>("setOnOpen_cxx");

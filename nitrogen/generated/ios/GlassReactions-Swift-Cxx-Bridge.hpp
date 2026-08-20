@@ -60,6 +60,21 @@ namespace margelo::nitro::glassreactions::bridge::swift {
     return vector;
   }
   
+  // pragma MARK: std::optional<bool>
+  /**
+   * Specialized version of `std::optional<bool>`.
+   */
+  using std__optional_bool_ = std::optional<bool>;
+  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
+    return std::optional<bool>(value);
+  }
+  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
+  }
+  
   // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>
   /**
    * Specialized version of `std::function<void(const std::string&, const std::optional<std::string>&)>`.
@@ -80,6 +95,28 @@ namespace margelo::nitro::glassreactions::bridge::swift {
   Func_void_std__string_std__optional_std__string_ create_Func_void_std__string_std__optional_std__string_(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_std__string_std__optional_std__string__Wrapper wrap_Func_void_std__string_std__optional_std__string_(Func_void_std__string_std__optional_std__string_ value) noexcept {
     return Func_void_std__string_std__optional_std__string__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&, const std::string&)>`.
+   */
+  using Func_void_std__string_std__string = std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * triggerId * /, const std::string& / * emoji * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_std__string_Wrapper(std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>>(std::move(func))) {}
+    inline void call(std::string triggerId, std::string emoji) const noexcept {
+      _function->operator()(triggerId, emoji);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string_std__string create_Func_void_std__string_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_std__string_Wrapper wrap_Func_void_std__string_std__string(Func_void_std__string_std__string value) noexcept {
+    return Func_void_std__string_std__string_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::function<void(const std::string& /* triggerId */)>

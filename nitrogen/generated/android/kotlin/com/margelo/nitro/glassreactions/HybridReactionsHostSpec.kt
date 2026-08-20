@@ -33,7 +33,7 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun activate(renderMode: ReactionRenderMode, longPressDurationMs: Double): Unit
+  abstract fun activate(renderMode: ReactionRenderMode, longPressDurationMs: Double, anotherReactionEnabled: Boolean): Unit
   
   @DoNotStrip
   @Keep
@@ -41,11 +41,11 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun registerTrigger(triggerId: String, viewTag: Double, items: Array<NativeReactionItem>, selectedId: String?): Unit
+  abstract fun registerTrigger(triggerId: String, viewTag: Double, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?): Unit
   
   @DoNotStrip
   @Keep
-  abstract fun updateTrigger(triggerId: String, items: Array<NativeReactionItem>, selectedId: String?): Unit
+  abstract fun updateTrigger(triggerId: String, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?): Unit
   
   @DoNotStrip
   @Keep
@@ -57,6 +57,15 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   @Keep
   private fun setOnSelect_cxx(callback: Func_void_std__string_std__optional_std__string_): Unit {
     val __result = setOnSelect(callback)
+    return __result
+  }
+  
+  abstract fun setOnSelectAnother(callback: (triggerId: String, emoji: String) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun setOnSelectAnother_cxx(callback: Func_void_std__string_std__string): Unit {
+    val __result = setOnSelectAnother(callback)
     return __result
   }
   

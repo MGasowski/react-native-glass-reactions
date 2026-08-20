@@ -45,17 +45,28 @@ const EMOJI_BY_ID: Record<string, string> = Object.fromEntries(
 function Row({
   index,
   selected,
+  custom,
   onSelect,
+  onSelectAnother,
   triggersEnabled,
 }: {
   readonly index: number;
   readonly selected?: ReactionId;
+  readonly custom?: string;
   readonly onSelect: (index: number, id: ReactionId | null) => void;
+  readonly onSelectAnother: (index: number, emoji: string) => void;
   readonly triggersEnabled: boolean;
 }) {
   const handleSelect = useCallback(
     (id: ReactionId | null) => onSelect(index, id),
     [index, onSelect]
+  );
+
+  // The example scores by emoji when the pick comes from the native emoji
+  // picker; a real app would likely create a reaction record instead.
+  const handleSelectAnother = useCallback(
+    (emoji: string) => onSelectAnother(index, emoji),
+    [index, onSelectAnother]
   );
 
   const content = (
@@ -71,7 +82,9 @@ function Row({
         accessibilityLabel={selected ?? 'none'}
       >
         <Text style={styles.badgeText}>
-          {selected ? EMOJI_BY_ID[selected] : '–'}
+          {/* Custom picks from "another reaction" arrive as the emoji itself,
+              so an id with no entry in the map is displayed as-is. */}
+          {selected ? (EMOJI_BY_ID[selected] ?? selected) : '–'}
         </Text>
       </View>
     </>
@@ -89,6 +102,8 @@ function Row({
       items={REACTIONS}
       selected={selected}
       onSelect={handleSelect}
+      onSelectAnother={handleSelectAnother}
+      anotherSelected={custom}
       style={styles.row}
     >
       {content}
@@ -98,6 +113,9 @@ function Row({
 
 export default function App() {
   const [scores, setScores] = useState<Record<number, ReactionId>>({});
+  // The last custom emoji picked per row: shown in the picker after the
+  // separator, replaced by the next pick (max one).
+  const [customs, setCustoms] = useState<Record<number, string>>({});
 
   const handleSelect = useCallback((index: number, id: ReactionId | null) => {
     setScores((previous) => {
@@ -111,6 +129,14 @@ export default function App() {
     });
   }, []);
 
+  const handleSelectAnother = useCallback(
+    (index: number, emoji: string) => {
+      setCustoms((previous) => ({ ...previous, [index]: emoji }));
+      handleSelect(index, emoji);
+    },
+    [handleSelect]
+  );
+
   return (
     <View style={styles.container}>
       {/* Required at the root. Renders nothing; installs the one recognizer. */}
@@ -123,7 +149,9 @@ export default function App() {
           <Row
             index={item}
             selected={scores[item]}
+            custom={customs[item]}
             onSelect={handleSelect}
+            onSelectAnother={handleSelectAnother}
             triggersEnabled={TRIGGERS_ENABLED}
           />
         )}

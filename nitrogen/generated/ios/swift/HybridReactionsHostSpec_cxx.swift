@@ -130,9 +130,9 @@ open class HybridReactionsHostSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func activate(renderMode: Int32, longPressDurationMs: Double) -> bridge.Result_void_ {
+  public final func activate(renderMode: Int32, longPressDurationMs: Double, anotherReactionEnabled: Bool) -> bridge.Result_void_ {
     do {
-      try self.__implementation.activate(renderMode: margelo.nitro.glassreactions.ReactionRenderMode(rawValue: renderMode)!, longPressDurationMs: longPressDurationMs)
+      try self.__implementation.activate(renderMode: margelo.nitro.glassreactions.ReactionRenderMode(rawValue: renderMode)!, longPressDurationMs: longPressDurationMs, anotherReactionEnabled: anotherReactionEnabled)
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
@@ -152,11 +152,25 @@ open class HybridReactionsHostSpec_cxx {
   }
   
   @inline(__always)
-  public final func registerTrigger(triggerId: std.string, viewTag: Double, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_) -> bridge.Result_void_ {
+  public final func registerTrigger(triggerId: std.string, viewTag: Double, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_) -> bridge.Result_void_ {
     do {
       try self.__implementation.registerTrigger(triggerId: String(triggerId), viewTag: viewTag, items: items.map({ __item in __item }), selectedId: { () -> String? in
         if bridge.has_value_std__optional_std__string_(selectedId) {
           let __unwrapped = bridge.get_std__optional_std__string_(selectedId)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }(), anotherReaction: { () -> Bool? in
+        if bridge.has_value_std__optional_bool_(anotherReaction) {
+          let __unwrapped = bridge.get_std__optional_bool_(anotherReaction)
+          return __unwrapped
+        } else {
+          return nil
+        }
+      }(), anotherSelected: { () -> String? in
+        if bridge.has_value_std__optional_std__string_(anotherSelected) {
+          let __unwrapped = bridge.get_std__optional_std__string_(anotherSelected)
           return String(__unwrapped)
         } else {
           return nil
@@ -170,11 +184,25 @@ open class HybridReactionsHostSpec_cxx {
   }
   
   @inline(__always)
-  public final func updateTrigger(triggerId: std.string, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_) -> bridge.Result_void_ {
+  public final func updateTrigger(triggerId: std.string, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_) -> bridge.Result_void_ {
     do {
       try self.__implementation.updateTrigger(triggerId: String(triggerId), items: items.map({ __item in __item }), selectedId: { () -> String? in
         if bridge.has_value_std__optional_std__string_(selectedId) {
           let __unwrapped = bridge.get_std__optional_std__string_(selectedId)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }(), anotherReaction: { () -> Bool? in
+        if bridge.has_value_std__optional_bool_(anotherReaction) {
+          let __unwrapped = bridge.get_std__optional_bool_(anotherReaction)
+          return __unwrapped
+        } else {
+          return nil
+        }
+      }(), anotherSelected: { () -> String? in
+        if bridge.has_value_std__optional_std__string_(anotherSelected) {
+          let __unwrapped = bridge.get_std__optional_std__string_(anotherSelected)
           return String(__unwrapped)
         } else {
           return nil
@@ -211,6 +239,22 @@ open class HybridReactionsHostSpec_cxx {
               return .init()
             }
           }())
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func setOnSelectAnother(callback: bridge.Func_void_std__string_std__string) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.setOnSelectAnother(callback: { () -> (String, String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string_std__string(callback)
+        return { (__triggerId: String, __emoji: String) -> Void in
+          __wrappedFunction.call(std.string(__triggerId), std.string(__emoji))
         }
       }())
       return bridge.create_Result_void_()

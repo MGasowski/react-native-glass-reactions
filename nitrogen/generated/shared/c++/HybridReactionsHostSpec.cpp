@@ -21,6 +21,7 @@ namespace margelo::nitro::glassreactions {
       prototype.registerHybridMethod("updateTrigger", &HybridReactionsHostSpec::updateTrigger);
       prototype.registerHybridMethod("unregisterTrigger", &HybridReactionsHostSpec::unregisterTrigger);
       prototype.registerHybridMethod("setOnSelect", &HybridReactionsHostSpec::setOnSelect);
+      prototype.registerHybridMethod("setOnSelectAnother", &HybridReactionsHostSpec::setOnSelectAnother);
       prototype.registerHybridMethod("setOnOpen", &HybridReactionsHostSpec::setOnOpen);
       prototype.registerHybridMethod("setOnClose", &HybridReactionsHostSpec::setOnClose);
     });

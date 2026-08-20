@@ -224,7 +224,8 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          # Writes the .npmrc that resolves ${NODE_AUTH_TOKEN} below.
+          # registry-url is what makes npm resolve OIDC trusted publishing for
+          # this job; no token is involved.
           registry-url: 'https://registry.npmjs.org'
 
       - name: Build package
@@ -246,7 +247,10 @@ jobs:
       # --ignore-scripts because "Build package" above already ran prepare.
       # Letting npm re-run it here would rebuild everything a second time and
       # add a failure mode between a green build and the actual publish.
+      #
+      # No --provenance flag and no NODE_AUTH_TOKEN: this package is linked as
+      # a trusted publisher on npmjs.com for this workflow, so npm publish
+      # authenticates via OIDC (id-token: write below) and provenance is
+      # attached automatically.
       - name: Publish to npm
-        run: npm publish --provenance --access public --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --ignore-scripts

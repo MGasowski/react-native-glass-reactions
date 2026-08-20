@@ -47,7 +47,11 @@ export interface ReactionsHost extends HybridObject<{
   readonly isLiquidGlassSupported: boolean;
 
   /** Installs the recognizer and warms the picker off the critical path. */
-  activate(renderMode: ReactionRenderMode, longPressDurationMs: number): void;
+  activate(
+    renderMode: ReactionRenderMode,
+    longPressDurationMs: number,
+    anotherReactionEnabled: boolean
+  ): void;
 
   /** Tears down the recognizer and releases the pooled picker. */
   deactivate(): void;
@@ -56,13 +60,17 @@ export interface ReactionsHost extends HybridObject<{
     triggerId: string,
     viewTag: number,
     items: NativeReactionItem[],
-    selectedId?: string
+    selectedId?: string,
+    anotherReaction?: boolean,
+    anotherSelected?: string
   ): void;
 
   updateTrigger(
     triggerId: string,
     items: NativeReactionItem[],
-    selectedId?: string
+    selectedId?: string,
+    anotherReaction?: boolean,
+    anotherSelected?: string
   ): void;
 
   unregisterTrigger(triggerId: string): void;
@@ -72,6 +80,15 @@ export interface ReactionsHost extends HybridObject<{
    * Fires at touch-up; the collapse animation runs after it (spec §4.3).
    */
   setOnSelect(callback: (triggerId: string, reactionId?: string) => void): void;
+
+  /**
+   * Fires when the user picks an emoji through the "another reaction" plus
+   * item's native emoji picker. The emoji is not one of the registered items,
+   * so it is reported by value rather than by id.
+   */
+  setOnSelectAnother(
+    callback: (triggerId: string, emoji: string) => void
+  ): void;
   setOnOpen(callback: (triggerId: string) => void): void;
   setOnClose(callback: (triggerId: string) => void): void;
 }

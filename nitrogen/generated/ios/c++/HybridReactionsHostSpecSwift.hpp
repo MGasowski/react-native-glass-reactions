@@ -76,8 +76,8 @@ namespace margelo::nitro::glassreactions {
 
   public:
     // Methods
-    inline void activate(ReactionRenderMode renderMode, double longPressDurationMs) override {
-      auto __result = _swiftPart.activate(static_cast<int>(renderMode), std::forward<decltype(longPressDurationMs)>(longPressDurationMs));
+    inline void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) override {
+      auto __result = _swiftPart.activate(static_cast<int>(renderMode), std::forward<decltype(longPressDurationMs)>(longPressDurationMs), std::forward<decltype(anotherReactionEnabled)>(anotherReactionEnabled));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -88,14 +88,14 @@ namespace margelo::nitro::glassreactions {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) override {
-      auto __result = _swiftPart.registerTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), items, selectedId);
+    inline void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override {
+      auto __result = _swiftPart.registerTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), items, selectedId, anotherReaction, anotherSelected);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) override {
-      auto __result = _swiftPart.updateTrigger(triggerId, items, selectedId);
+    inline void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override {
+      auto __result = _swiftPart.updateTrigger(triggerId, items, selectedId, anotherReaction, anotherSelected);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -108,6 +108,12 @@ namespace margelo::nitro::glassreactions {
     }
     inline void setOnSelect(const std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>& callback) override {
       auto __result = _swiftPart.setOnSelect(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void setOnSelectAnother(const std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>& callback) override {
+      auto __result = _swiftPart.setOnSelectAnother(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

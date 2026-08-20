@@ -22,6 +22,14 @@ namespace margelo::nitro::glassreactions::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>
+  Func_void_std__string_std__string create_Func_void_std__string_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = GlassReactions::Func_void_std__string_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& triggerId, const std::string& emoji) mutable -> void {
+      swiftClosure.call(triggerId, emoji);
+    };
+  }
+  
   // pragma MARK: std::function<void(const std::string& /* triggerId */)>
   Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = GlassReactions::Func_void_std__string::fromUnsafe(swiftClosureWrapper);

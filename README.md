@@ -4,6 +4,26 @@ An Instagram-style reactions picker rendered as a **fully native view** — Swif
 
 On iOS 26 the picker is drawn with the system **Liquid Glass** material. On older iOS and on Android it degrades to a defined flat surface. It never crashes and never fails a build on an unsupported OS.
 
+<table>
+<tr>
+<td align="center" width="33%"><b>iOS 26 — Liquid Glass</b></td>
+<td align="center" width="33%"><b>iOS — glass off</b></td>
+<td align="center" width="33%"><b>Android</b></td>
+</tr>
+<tr>
+<td><img src="assets/demo-ios-glass.gif" alt="Liquid Glass picker on iOS 26" width="100%"></td>
+<td><img src="assets/demo-ios-fallback.gif" alt="Opaque fallback picker under Reduce Transparency" width="100%"></td>
+<td><img src="assets/demo-android.gif" alt="Flat translucent picker on Android" width="100%"></td>
+</tr>
+<tr>
+<td align="center"><sub>Translucent capsule — the row behind it shows through</sub></td>
+<td align="center"><sub>Opaque capsule, under Reduce Transparency</sub></td>
+<td align="center"><sub>Flat translucent capsule, emoji everywhere</sub></td>
+</tr>
+</table>
+
+Same gesture and the same JavaScript in all three: long-press, drag across the row, release. Only the capsule material and the reaction rendering differ per platform.
+
 > **Requirements — read before installing.**
 > **Xcode 26+** is required to build the iOS side. A consumer on an older Xcode gets a *compile failure*, not a graceful degrade.
 > Also required: **React Native 0.80+**, the **New Architecture**, and `react-native-nitro-modules`.
@@ -85,6 +105,33 @@ Set `renderMode="emoji"` on the host to force emoji everywhere.
 <img src="assets/selection-model.png" alt="Selection model" width="100%">
 
 One reaction per user per item — upsert, not additive. Picking a different reaction replaces the current one; picking the reaction that is already selected clears it and emits `null`.
+
+### Another reaction
+
+Give a trigger an `onSelectAnother` handler and the picker grows a trailing **＋** item. Releasing on it opens the **native emoji picker** — the system emoji keyboard on iOS, androidx's `EmojiPickerView` bottom sheet on Android — and the chosen emoji arrives in the handler as a string, not an id:
+
+```tsx
+<ReactionTrigger
+  items={REACTIONS}
+  selected={score ?? undefined}
+  onSelect={setScore}
+  onSelectAnother={(emoji) => addCustomReaction(emoji)}
+  anotherSelected={lastCustomEmoji}
+>
+```
+
+Pass the picked emoji back as `anotherSelected` and it becomes one extra selectable item in the picker, separated from your reactions by a hairline divider, just before the plus: `[your reactions] | [custom] [+]`. One custom slot exists at most — pass the newest pick to replace it. Selecting it reports through `onSelect` with the emoji string as the id, with the usual upsert-and-deselect semantics.
+
+The plus renders only when there is somewhere for the pick to go — no handler, no plus. It can also be switched off explicitly:
+
+- **Globally:** `<ReactionsPickerHost anotherReactionEnabled={false} />`
+- **Per picker:** `<ReactionTrigger anotherReactionEnabled={false} … />` (overrides the global in either direction)
+
+<p align="center">
+  <img src="assets/demo-another-reaction.gif" alt="Dragging to the plus opens the system emoji keyboard; the picked emoji returns as a custom slot before the plus" width="300">
+</p>
+
+<p align="center"><sub>Drag to <b>＋</b> → system emoji keyboard → the pick lands on the row and joins the picker, after the divider.</sub></p>
 
 <img src="assets/api.png" alt="API" width="100%">
 

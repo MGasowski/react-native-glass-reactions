@@ -1,6 +1,7 @@
 package com.margelo.nitro.glassreactions
 
 import android.app.Activity
+import android.graphics.Color
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
@@ -23,7 +24,14 @@ import kotlin.math.abs
 private data class TriggerRegistration(
     val viewTag: Int,
     var items: Array<NativeReactionItem>,
-    var selectedId: String?
+    var selectedId: String?,
+    /**
+     * Per-trigger override for the "another reaction" plus item; null inherits
+     * the host-wide setting.
+     */
+    var anotherReaction: Boolean?,
+    /** The custom emoji previously picked through "another reaction", if any. */
+    var anotherSelected: String?
 ) {
     override fun equals(other: Any?) = this === other
     override fun hashCode() = viewTag
@@ -38,11 +46,16 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private val triggerIdByTag = HashMap<Int, String>()
 
     private var onSelect: ((String, String?) -> Unit)? = null
+    private var onSelectAnother: ((String, String) -> Unit)? = null
     private var onOpen: ((String) -> Unit)? = null
     private var onClose: ((String) -> Unit)? = null
 
     private var renderMode = ReactionRenderMode.AUTO
     private var longPressMs = 200L
+    private var anotherReactionEnabled = true
+
+    /** Owns the emoji-picker dialog opened by the trailing plus item. */
+    private val emojiSheet = AnotherReactionSheet()
 
     /** Pooled, not rebuilt — detached between interactions (spec §6.5). */
     private var picker: ReactionsPillView? = null
@@ -54,16 +67,14 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     // Active interaction
     private var activeTriggerId: String? = null
     private var activeItems: Array<NativeReactionItem> = emptyArray()
-    private var activeRect = Rect()
 
     /**
-     * Where the trigger was when the picker opened (screen coordinates, same
-     * space as activeRect), kept so the selection celebration can fly the
-     * chosen reaction back to it. Resolved once at gesture-begin — good
-     * enough, since scrolling is suppressed for the whole interaction.
+     * Whether the current interaction shows the trailing plus item. The plus
+     * occupies a slot after activeItems, so hit-testing counts it while
+     * selection reporting does not.
      */
-    private var activeTriggerCenterX = 0f
-    private var activeTriggerCenterY = 0f
+    private var activeShowsPlus = false
+    private var activeRect = Rect()
     private var focusedIndex: Int? = null
     private var pendingTrigger: Pair<String, View>? = null
     private var downX = 0f
@@ -79,15 +90,21 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         // Android has no Liquid Glass at all (spec §4.5).
         get() = false
 
-    override fun activate(renderMode: ReactionRenderMode, longPressDurationMs: Double) {
+    override fun activate(
+        renderMode: ReactionRenderMode,
+        longPressDurationMs: Double,
+        anotherReactionEnabled: Boolean
+    ) {
         this.renderMode = renderMode
         this.longPressMs = longPressDurationMs.toLong()
+        this.anotherReactionEnabled = anotherReactionEnabled
         main.post { install() }
     }
 
     override fun deactivate() {
         main.post {
             main.removeCallbacks(openRunnable)
+            emojiSheet.dismiss()
             dismiss(null, cancelled = true)
             wrappedActivity?.window?.callback = originalCallback
             originalCallback = null
@@ -102,11 +119,14 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         triggerId: String,
         viewTag: Double,
         items: Array<NativeReactionItem>,
-        selectedId: String?
+        selectedId: String?,
+        anotherReaction: Boolean?,
+        anotherSelected: String?
     ) {
         val tag = viewTag.toInt()
         main.post {
-            registrations[triggerId] = TriggerRegistration(tag, items, selectedId)
+            registrations[triggerId] =
+                TriggerRegistration(tag, items, selectedId, anotherReaction, anotherSelected)
             triggerIdByTag[tag] = triggerId
         }
     }
@@ -114,12 +134,16 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     override fun updateTrigger(
         triggerId: String,
         items: Array<NativeReactionItem>,
-        selectedId: String?
+        selectedId: String?,
+        anotherReaction: Boolean?,
+        anotherSelected: String?
     ) {
         main.post {
             registrations[triggerId]?.let {
                 it.items = items
                 it.selectedId = selectedId
+                it.anotherReaction = anotherReaction
+                it.anotherSelected = anotherSelected
             }
         }
     }
@@ -135,6 +159,10 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
     override fun setOnSelect(callback: (String, String?) -> Unit) {
         onSelect = callback
+    }
+
+    override fun setOnSelectAnother(callback: (String, String) -> Unit) {
+        onSelectAnother = callback
     }
 
     override fun setOnOpen(callback: (String) -> Unit) {
@@ -266,6 +294,51 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         return null
     }
 
+    /**
+     * Whether the surface behind the trigger is dark. The pixels decide:
+     * walking view background colours is defeated by React Native's view
+     * flattening (the painted colour often lives on no ancestor at all), so
+     * the trigger's on-screen region is software-drawn squashed into a
+     * handful of pixels and averaged. One tiny render per open, at
+     * gesture-begin — never on the scroll or focus path.
+     */
+    private fun isDarkSurface(view: View): Boolean {
+        val nightFallback = (view.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        return try {
+            val decor = currentActivity()?.window?.decorView ?: return nightFallback
+            val width = view.width
+            val height = view.height
+            if (width < 1 || height < 1) return nightFallback
+
+            val location = IntArray(2)
+            view.getLocationInWindow(location)
+
+            val sample = 4
+            val bitmap = android.graphics.Bitmap.createBitmap(
+                sample, sample, android.graphics.Bitmap.Config.ARGB_8888
+            )
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.scale(sample.toFloat() / width, sample.toFloat() / height)
+            canvas.translate(-location[0].toFloat(), -location[1].toFloat())
+            decor.draw(canvas)
+
+            var total = 0.0
+            for (y in 0 until sample) {
+                for (x in 0 until sample) {
+                    val pixel = bitmap.getPixel(x, y)
+                    total += (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) /
+                        (3.0 * 255.0)
+                }
+            }
+            bitmap.recycle()
+            total / (sample * sample) < 0.5
+        } catch (_: Throwable) {
+            nightFallback
+        }
+    }
+
     private fun containsPoint(view: View, x: Int, y: Int): Boolean {
         val location = IntArray(2)
         view.getLocationOnScreen(location)
@@ -282,13 +355,28 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         val pill = picker ?: return
 
         activeTriggerId = triggerId
-        activeItems = registration.items
+        activeShowsPlus = registration.anotherReaction ?: anotherReactionEnabled
+
+        // The custom pick rides with the plus: both belong to the "another
+        // reaction" section, so disabling the feature hides both.
+        val custom = registration.anotherSelected?.takeIf { it.isNotEmpty() }
+        activeItems = if (activeShowsPlus && custom != null) {
+            registration.items + NativeReactionItem(custom, custom, null, null, custom)
+        } else {
+            registration.items
+        }
 
         // Ownership of the touch is now unambiguous: stop ancestors (the list)
         // from intercepting so opening never scrolls (spec §6.4).
         triggerView.parent?.requestDisallowInterceptTouchEvent(true)
 
-        pill.applyItems(registration.items, registration.selectedId, renderMode)
+        // The pill matches the surface it floats over, not the system theme.
+        // Set before applyItems: the plus glyph rasterises in this appearance.
+        pill.setSurfaceAppearance(isDarkSurface(triggerView))
+        pill.applyItems(
+            registration.items, registration.selectedId, renderMode,
+            if (activeShowsPlus) custom else null, activeShowsPlus
+        )
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         pill.measure(unspecified, unspecified)
 
@@ -329,9 +417,6 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             left + overlayLocation[0] + width,
             top + overlayLocation[1] + height
         )
-        activeTriggerCenterX = location[0] + triggerView.width / 2f
-        activeTriggerCenterY = location[1] + triggerView.height / 2f
-
         // No initial focus: the finger is still on the row that was pressed,
         // not on a reaction.
         focusedIndex = null
@@ -341,7 +426,6 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     }
 
     private fun indexAt(x: Float, y: Float): Int? {
-        if (activeItems.isEmpty()) return null
         // Just enough tolerance to stop the selection flickering at the edge,
         // not enough to keep selecting from well outside the picker. This was
         // 160px — roughly a centimetre — which selected reactions from far
@@ -349,8 +433,9 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         val slack = focusTolerancePx
         if (x < activeRect.left || x > activeRect.right) return null
         if (y < activeRect.top - slack || y > activeRect.bottom + slack) return null
-        val stride = activeRect.width().toFloat() / activeItems.size
-        return ((x - activeRect.left) / stride).toInt().coerceIn(0, activeItems.size - 1)
+        // The pill owns the slot geometry: slots are not uniform once the
+        // section separator inserts its extra width, so a plain stride drifts.
+        return picker?.slotIndex(x - activeRect.left)
     }
 
     private fun updateFocus(x: Float, y: Float) {
@@ -369,6 +454,19 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         val current = registrations[triggerId]?.selectedId
         val index = focusedIndex
 
+        // Releasing on the plus is not a selection: the celebration plays, but
+        // the interaction hands over to the emoji picker instead of reporting
+        // through onSelect.
+        if (activeShowsPlus && index == activeItems.size) {
+            dismiss(null, cancelled = false, reportSelection = false)
+            currentActivity()?.let { activity ->
+                emojiSheet.present(activity) { emoji ->
+                    onSelectAnother?.invoke(triggerId, emoji)
+                }
+            }
+            return
+        }
+
         val selection = if (index != null && index < activeItems.size) {
             val candidate = activeItems[index].id
             // Upsert with deselect (spec §5).
@@ -379,19 +477,21 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         dismiss(selection, cancelled = index == null)
     }
 
-    private fun dismiss(selected: String?, cancelled: Boolean) {
+    private fun dismiss(
+        selected: String?, cancelled: Boolean, reportSelection: Boolean = true
+    ) {
         val triggerId = activeTriggerId ?: return
 
-        if (!cancelled) onSelect?.invoke(triggerId, selected)
+        if (!cancelled && reportSelection) onSelect?.invoke(triggerId, selected)
 
         // The celebration plays on whatever was under the finger, whether that
         // committed a new selection or cleared the existing one — either way
         // the user chose that reaction.
         val celebratedIndex = if (cancelled) null else focusedIndex
-        val itemCount = activeItems.size
 
         activeTriggerId = null
         activeItems = emptyArray()
+        activeShowsPlus = false
         focusedIndex = null
 
         val pill = picker
@@ -401,7 +501,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         // cost; deallocating would only re-buy construction (spec §6.5).
         val teardown: () -> Unit = { (pill?.parent as? ViewGroup)?.removeView(pill) }
 
-        if (celebratedIndex != null && itemCount > 0) {
+        if (celebratedIndex != null && pill != null) {
             // A firmer confirm than the per-item tick.
             pill?.performHapticFeedback(
                 if (android.os.Build.VERSION.SDK_INT >= 30)
@@ -410,17 +510,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
                     HapticFeedbackConstants.KEYBOARD_TAP
             )
 
-            // Vector from the chosen reaction's resting centre to the trigger's
-            // centre, both in screen coordinates.
-            val stride = activeRect.width().toFloat() / itemCount
-            val itemCenterX = activeRect.left + stride * (celebratedIndex + 0.5f)
-            val itemCenterY = activeRect.exactCenterY()
-            pill?.animateSelection(
-                celebratedIndex,
-                activeTriggerCenterX - itemCenterX,
-                activeTriggerCenterY - itemCenterY,
-                teardown
-            )
+            pill.animateSelection(celebratedIndex, teardown)
         } else {
             pill?.setFocusedIndex(null)
             pill?.animateOut(teardown)

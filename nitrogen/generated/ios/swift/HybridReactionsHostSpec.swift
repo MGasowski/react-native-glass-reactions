@@ -13,12 +13,13 @@ public protocol HybridReactionsHostSpec_protocol: HybridObject {
   var isLiquidGlassSupported: Bool { get }
 
   // Methods
-  func activate(renderMode: ReactionRenderMode, longPressDurationMs: Double) throws -> Void
+  func activate(renderMode: ReactionRenderMode, longPressDurationMs: Double, anotherReactionEnabled: Bool) throws -> Void
   func deactivate() throws -> Void
-  func registerTrigger(triggerId: String, viewTag: Double, items: [NativeReactionItem], selectedId: String?) throws -> Void
-  func updateTrigger(triggerId: String, items: [NativeReactionItem], selectedId: String?) throws -> Void
+  func registerTrigger(triggerId: String, viewTag: Double, items: [NativeReactionItem], selectedId: String?, anotherReaction: Bool?, anotherSelected: String?) throws -> Void
+  func updateTrigger(triggerId: String, items: [NativeReactionItem], selectedId: String?, anotherReaction: Bool?, anotherSelected: String?) throws -> Void
   func unregisterTrigger(triggerId: String) throws -> Void
   func setOnSelect(callback: @escaping (_ triggerId: String, _ reactionId: String?) -> Void) throws -> Void
+  func setOnSelectAnother(callback: @escaping (_ triggerId: String, _ emoji: String) -> Void) throws -> Void
   func setOnOpen(callback: @escaping (_ triggerId: String) -> Void) throws -> Void
   func setOnClose(callback: @escaping (_ triggerId: String) -> Void) throws -> Void
 }
