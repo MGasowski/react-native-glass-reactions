@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/MGasowski/react-native-glass-reactions/compare/v0.1.0...v0.1.1) (2026-08-20)
+
+### Features
+
+* native "another reaction" plus with system emoji picker ([#3](https://github.com/MGasowski/react-native-glass-reactions/issues/3)) ([b3775de](https://github.com/MGasowski/react-native-glass-reactions/commit/b3775ded4b838b4dce72b2335b29f117e4c288b8))
+* richer open, focus, and selection animations ([#2](https://github.com/MGasowski/react-native-glass-reactions/issues/2)) ([efbb950](https://github.com/MGasowski/react-native-glass-reactions/commit/efbb9508e272ddbd62de917ef51b31e3996007ff))
+
 # 0.1.0 (2026-08-19)
 
 ### Bug Fixes
