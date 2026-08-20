@@ -12,6 +12,24 @@ export interface ReactionTriggerProps extends ViewProps {
   readonly selected?: ReactionId;
   /** `null` means the current selection was cleared. */
   readonly onSelect: (id: ReactionId | null) => void;
+  /**
+   * Fires when the user picks an emoji through the "another reaction" plus
+   * item's native emoji picker. The plus only renders on triggers that supply
+   * this handler.
+   */
+  readonly onSelectAnother?: (emoji: string) => void;
+  /**
+   * The custom emoji previously picked through "another reaction", if any.
+   * Rendered as one extra selectable item between the separator and the plus
+   * (max one — pass the newest pick to replace it). Selecting it reports
+   * through `onSelect` with the emoji string as the id.
+   */
+  readonly anotherSelected?: string;
+  /**
+   * Per-picker override for the "another reaction" plus item. Unset inherits
+   * the `ReactionsPickerHost` global; `false` hides the plus on this trigger.
+   */
+  readonly anotherReactionEnabled?: boolean;
   readonly onOpen?: () => void;
   readonly onClose?: () => void;
   readonly disabled?: boolean;
@@ -31,6 +49,9 @@ export function ReactionTrigger({
   items,
   selected,
   onSelect,
+  onSelectAnother,
+  anotherSelected,
+  anotherReactionEnabled,
   onOpen,
   onClose,
   disabled = false,
@@ -43,8 +64,14 @@ export function ReactionTrigger({
 
   // Held in a ref so the native registration never has to be redone just
   // because a callback identity changed between renders.
-  const handlersRef = useRef({ onSelect, onOpen, onClose });
-  handlersRef.current = { onSelect, onOpen, onClose };
+  const handlersRef = useRef({ onSelect, onSelectAnother, onOpen, onClose });
+  handlersRef.current = { onSelect, onSelectAnother, onOpen, onClose };
+
+  // Without a handler there is nothing for a picked emoji to reach, so the
+  // plus is forced off rather than rendered inert. Otherwise the explicit prop
+  // wins, and `undefined` defers to the host's global setting.
+  const anotherReaction =
+    onSelectAnother == null ? false : anotherReactionEnabled;
 
   const nativeItems = items.map((item) => ({
     id: item.id,
@@ -62,10 +89,18 @@ export function ReactionTrigger({
 
     addTriggerListener(triggerId, {
       onSelect: (id) => handlersRef.current.onSelect(id),
+      onSelectAnother: (emoji) => handlersRef.current.onSelectAnother?.(emoji),
       onOpen: () => handlersRef.current.onOpen?.(),
       onClose: () => handlersRef.current.onClose?.(),
     });
-    host.registerTrigger(triggerId, tag, nativeItems, selected);
+    host.registerTrigger(
+      triggerId,
+      tag,
+      nativeItems,
+      selected,
+      anotherReaction,
+      anotherSelected
+    );
     registeredRef.current = true;
 
     return () => {
@@ -79,11 +114,19 @@ export function ReactionTrigger({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerId, disabled]);
 
+  const nativeItemsKey = JSON.stringify(nativeItems);
+
   useEffect(() => {
     if (!registeredRef.current) return;
-    host.updateTrigger(triggerId, nativeItems, selected);
+    host.updateTrigger(
+      triggerId,
+      nativeItems,
+      selected,
+      anotherReaction,
+      anotherSelected
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerId, selected, JSON.stringify(nativeItems)]);
+  }, [triggerId, selected, anotherReaction, anotherSelected, nativeItemsKey]);
 
   return (
     <View ref={viewRef} collapsable={false} {...viewProps}>

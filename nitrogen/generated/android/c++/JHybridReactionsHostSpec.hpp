@@ -54,12 +54,13 @@ namespace margelo::nitro::glassreactions {
 
   public:
     // Methods
-    void activate(ReactionRenderMode renderMode, double longPressDurationMs) override;
+    void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) override;
     void deactivate() override;
-    void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) override;
-    void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) override;
+    void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override;
+    void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override;
     void unregisterTrigger(const std::string& triggerId) override;
     void setOnSelect(const std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>& callback) override;
+    void setOnSelectAnother(const std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>& callback) override;
     void setOnOpen(const std::function<void(const std::string& /* triggerId */)>& callback) override;
     void setOnClose(const std::function<void(const std::string& /* triggerId */)>& callback) override;
 

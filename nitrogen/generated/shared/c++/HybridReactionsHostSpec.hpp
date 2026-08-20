@@ -56,12 +56,13 @@ namespace margelo::nitro::glassreactions {
 
     public:
       // Methods
-      virtual void activate(ReactionRenderMode renderMode, double longPressDurationMs) = 0;
+      virtual void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) = 0;
       virtual void deactivate() = 0;
-      virtual void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) = 0;
-      virtual void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId) = 0;
+      virtual void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) = 0;
+      virtual void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) = 0;
       virtual void unregisterTrigger(const std::string& triggerId) = 0;
       virtual void setOnSelect(const std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>& callback) = 0;
+      virtual void setOnSelectAnother(const std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>& callback) = 0;
       virtual void setOnOpen(const std::function<void(const std::string& /* triggerId */)>& callback) = 0;
       virtual void setOnClose(const std::function<void(const std::string& /* triggerId */)>& callback) = 0;
 

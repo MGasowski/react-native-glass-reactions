@@ -17,6 +17,7 @@
 
 #include "JHybridReactionsHostSpec.hpp"
 #include "JFunc_void_std__string_std__optional_std__string_.hpp"
+#include "JFunc_void_std__string_std__string.hpp"
 #include "JFunc_void_std__string.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
@@ -44,6 +45,7 @@ void registerAllNatives() {
   // Register native JNI methods
   margelo::nitro::glassreactions::JHybridReactionsHostSpec::CxxPart::registerNatives();
   margelo::nitro::glassreactions::JFunc_void_std__string_std__optional_std__string__cxx::registerNatives();
+  margelo::nitro::glassreactions::JFunc_void_std__string_std__string_cxx::registerNatives();
   margelo::nitro::glassreactions::JFunc_void_std__string_cxx::registerNatives();
 
   // Register Nitro Hybrid Objects

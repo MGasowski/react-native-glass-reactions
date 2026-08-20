@@ -7,6 +7,11 @@ private struct TriggerRegistration {
   let viewTag: Int
   var items: [NativeReactionItem]
   var selectedId: String?
+  /// Per-trigger override for the "another reaction" plus item; `nil` inherits
+  /// the host-wide setting.
+  var anotherReaction: Bool?
+  /// The custom emoji previously picked through "another reaction", if any.
+  var anotherSelected: String?
 }
 
 private enum Layout {
@@ -29,6 +34,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   // MARK: Callbacks
 
   private var onSelect: ((String, String?) -> Void)?
+  private var onSelectAnother: ((String, String) -> Void)?
   private var onOpen: ((String) -> Void)?
   private var onClose: ((String) -> Void)?
 
@@ -44,17 +50,22 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   private var recognizerDelegate: RecognizerDelegate?
 
   private var renderMode: ReactionRenderMode = .auto
+  private var anotherReactionEnabled = true
+
+  /// Owns the hidden text field that summons the system emoji keyboard —
+  /// iOS has no standalone emoji picker API, so the keyboard *is* the native
+  /// picker.
+  private let emojiInput = EmojiInputController()
 
   // MARK: Active interaction
 
   private var activeTriggerId: String?
   private var activeItems: [NativeReactionItem] = []
+  /// Whether the current interaction shows the trailing plus item. The plus
+  /// occupies a slot after `activeItems`, so hit-testing counts it while
+  /// selection reporting does not.
+  private var activeShowsPlus = false
   private var activePickerFrame: CGRect = .zero
-  /// Where the trigger was when the picker opened, kept so the selection
-  /// celebration can fly the chosen reaction back to it. Resolved once at
-  /// gesture-begin — good enough, since scrolling is disabled for the whole
-  /// interaction (spec §6.4).
-  private var activeTriggerFrame: CGRect = .zero
   private var focusedIndex: Int?
   private var disabledScrollView: UIScrollView?
   private var haptics: UIImpactFeedbackGenerator?
@@ -63,11 +74,16 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
   var isLiquidGlassSupported: Bool { GlassSupport.isAvailable }
 
-  func activate(renderMode: ReactionRenderMode, longPressDurationMs: Double) throws {
+  func activate(
+    renderMode: ReactionRenderMode,
+    longPressDurationMs: Double,
+    anotherReactionEnabled: Bool
+  ) throws {
     let duration = longPressDurationMs
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.renderMode = renderMode
+      self.anotherReactionEnabled = anotherReactionEnabled
       self.installRecognizer(minimumPressDuration: duration / 1000.0)
       self.warmPicker()
     }
@@ -81,6 +97,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       }
       self.recognizer = nil
       self.recognizerDelegate = nil
+      self.emojiInput.dismiss()
       self.dismiss(selected: nil, cancelled: true)
       self.pickerView = nil
       self.overlayWindow?.isHidden = true
@@ -92,13 +109,16 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     triggerId: String,
     viewTag: Double,
     items: [NativeReactionItem],
-    selectedId: String?
+    selectedId: String?,
+    anotherReaction: Bool?,
+    anotherSelected: String?
   ) throws {
     let tag = Int(viewTag)
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.registrations[triggerId] = TriggerRegistration(
-        viewTag: tag, items: items, selectedId: selectedId
+        viewTag: tag, items: items, selectedId: selectedId,
+        anotherReaction: anotherReaction, anotherSelected: anotherSelected
       )
       self.triggerIdByTag[tag] = triggerId
     }
@@ -107,12 +127,16 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   func updateTrigger(
     triggerId: String,
     items: [NativeReactionItem],
-    selectedId: String?
+    selectedId: String?,
+    anotherReaction: Bool?,
+    anotherSelected: String?
   ) throws {
     DispatchQueue.main.async { [weak self] in
       guard let self, var existing = self.registrations[triggerId] else { return }
       existing.items = items
       existing.selectedId = selectedId
+      existing.anotherReaction = anotherReaction
+      existing.anotherSelected = anotherSelected
       self.registrations[triggerId] = existing
     }
   }
@@ -133,6 +157,10 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
   func setOnSelect(callback: @escaping (String, String?) -> Void) throws {
     onSelect = callback
+  }
+
+  func setOnSelectAnother(callback: @escaping (String, String) -> Void) throws {
+    onSelectAnother = callback
   }
 
   func setOnOpen(callback: @escaping (String) -> Void) throws {
@@ -175,7 +203,14 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     guard pickerView == nil else { return }
     // Built once, off the critical path, so the first long-press does not pay
     // construction of the glass container (spec §6.5).
-    pickerView = ReactionsPillView()
+    let picker = ReactionsPillView()
+    pickerView = picker
+    // Attached hidden right away so the glass materialize animation UIKit
+    // plays on first attachment runs invisibly here, not on the first open.
+    if let overlay = ensureOverlayWindow() {
+      picker.isHidden = true
+      overlay.rootViewController?.view.addSubview(picker)
+    }
   }
 
   private func ensureOverlayWindow() -> UIWindow? {
@@ -252,7 +287,18 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     else { return }
 
     activeTriggerId = triggerId
-    activeItems = registration.items
+    activeShowsPlus = registration.anotherReaction ?? anotherReactionEnabled
+
+    // The custom pick rides with the plus: both belong to the "another
+    // reaction" section, so disabling the feature hides both.
+    var selectable = registration.items
+    if activeShowsPlus, let emoji = registration.anotherSelected, !emoji.isEmpty {
+      selectable.append(NativeReactionItem(
+        id: emoji, emoji: emoji, symbolIos: nil, symbolAndroid: nil,
+        accessibilityLabel: emoji
+      ))
+    }
+    activeItems = selectable
 
     // Ownership of the touch is now unambiguous: cancel the enclosing scroll
     // view's pan so opening the picker never scrolls the list (spec §6.4).
@@ -261,9 +307,29 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       disabledScrollView = scrollView
     }
 
+    // The pill matches the surface it floats over, not the system theme —
+    // materials, symbol tints, and the divider all resolve through this trait.
+    picker.overrideUserInterfaceStyle =
+      SurfaceAppearance.isDark(under: triggerView) ? .dark : .light
+
+    var renderables = ReactionResolver.resolve(
+      registration.items, renderMode: renderMode
+    )
+    if activeShowsPlus {
+      if let emoji = registration.anotherSelected, !emoji.isEmpty {
+        renderables.append(ReactionResolver.customRenderable(emoji: emoji))
+      }
+      renderables.append(ReactionResolver.anotherReactionRenderable())
+    }
+    // Divider between the consumer's reactions and the "another reaction"
+    // section, drawn only when both sides exist.
+    let separatorAfter: Int? =
+      activeShowsPlus && !registration.items.isEmpty
+        ? registration.items.count : nil
     picker.apply(
-      items: ReactionResolver.resolve(registration.items, renderMode: renderMode),
-      selectedId: registration.selectedId
+      items: renderables,
+      selectedId: registration.selectedId,
+      separatorAfter: separatorAfter
     )
 
     // Frame resolved from the live view, not from anything JS measured.
@@ -281,13 +347,25 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     origin.y = max(Layout.screenMargin, origin.y)
 
     activePickerFrame = CGRect(origin: origin, size: size)
-    activeTriggerFrame = triggerFrame
-    // Collapsed state is set before the frame, because prepareForPresentation
-    // moves the anchor point and assigning `frame` afterwards recomputes the
-    // layer position from it.
+    // Geometry via bounds and center, never `frame`: prepareForPresentation
+    // applies the collapsed scale transform, and assigning `frame` to a
+    // transformed view divides the size by the scale — which is exactly the
+    // bug where every pill came out ~16% wider than its content, items packed
+    // left with dead space on the right. The center accounts for the (0.5, 1)
+    // anchor prepareForPresentation sets.
     picker.prepareForPresentation()
-    picker.frame = activePickerFrame
-    overlay.rootViewController?.view.addSubview(picker)
+    picker.bounds = CGRect(origin: .zero, size: size)
+    picker.center = CGPoint(
+      x: activePickerFrame.midX, y: activePickerFrame.maxY
+    )
+    // Attached once and then only hidden/unhidden: re-attaching a glass
+    // effect view replays UIKit's frosted "materialize" animation, which is
+    // the grey flash on open. A hidden layer is not composited, so the
+    // detach-between-interactions GPU saving (spec §6.5) is preserved.
+    if picker.superview == nil {
+      overlay.rootViewController?.view.addSubview(picker)
+    }
+    picker.isHidden = false
     picker.animateIn()
 
     haptics = UIImpactFeedbackGenerator(style: .light)
@@ -305,7 +383,6 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   }
 
   private func index(at point: CGPoint) -> Int? {
-    guard !activeItems.isEmpty else { return nil }
     // Just enough tolerance to stop the selection flickering at the edge, not
     // enough to keep selecting from well outside the picker. The press that
     // opens the picker lands on the row below it, so generous slack here means
@@ -313,10 +390,9 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     let hitArea = activePickerFrame.insetBy(dx: 0, dy: -Layout.focusTolerance)
     guard hitArea.contains(point) else { return nil }
 
-    let localX = point.x - activePickerFrame.minX
-    let stride = activePickerFrame.width / CGFloat(activeItems.count)
-    let raw = Int(localX / stride)
-    return min(max(0, raw), activeItems.count - 1)
+    // The pill owns the slot geometry: slots are not uniform once the section
+    // separator inserts its extra width, so a plain stride would drift.
+    return pickerView?.slotIndex(atLocalX: point.x - activePickerFrame.minX)
   }
 
   private func updateFocus(at point: CGPoint) {
@@ -337,6 +413,17 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     guard let triggerId = activeTriggerId else { return }
     let registration = registrations[triggerId]
 
+    // Releasing on the plus is not a selection: the celebration plays, but the
+    // interaction hands over to the system emoji keyboard instead of reporting
+    // through onSelect.
+    if activeShowsPlus, focusedIndex == activeItems.count {
+      dismiss(selected: nil, cancelled: false, reportSelection: false)
+      emojiInput.present(over: keyWindow()) { [weak self] emoji in
+        self?.onSelectAnother?(triggerId, emoji)
+      }
+      return
+    }
+
     var selection: String?
     if let index = focusedIndex, index < activeItems.count {
       let candidate = activeItems[index].id
@@ -349,12 +436,14 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     dismiss(selected: hadFocus ? selection : nil, cancelled: !hadFocus)
   }
 
-  private func dismiss(selected: String?, cancelled: Bool) {
+  private func dismiss(
+    selected: String?, cancelled: Bool, reportSelection: Bool = true
+  ) {
     guard let triggerId = activeTriggerId else { return }
 
     // Selection is reported at touch-up; teardown waits for the animation
     // (spec §4.3).
-    if !cancelled {
+    if !cancelled && reportSelection {
       onSelect?(triggerId, selected)
     }
 
@@ -368,6 +457,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
     activeTriggerId = nil
     activeItems = []
+    activeShowsPlus = false
     focusedIndex = nil
 
     let picker = pickerView
@@ -376,7 +466,10 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // (spec §4.3). Detached, never deallocated: detaching buys the whole GPU
     // saving, deallocating would only re-buy construction cost (spec §6.5).
     let teardown = {
-      picker?.removeFromSuperview()
+      // Hidden, not detached: re-attaching a glass effect view replays the
+      // frosted materialize animation. Hidden layers are not composited, so
+      // the GPU saving of spec §6.5 is intact.
+      picker?.isHidden = true
       picker?.resetAfterDismissal()
     }
 
@@ -384,20 +477,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       // A firmer confirm than the per-item tick; the generator is prepared, so
       // it lands with the pop.
       haptics?.impactOccurred(intensity: 1.0)
-
-      // Vector from the chosen reaction's resting centre to the trigger's
-      // centre, both in window coordinates — the overlay is full-screen, so
-      // the picker's frame shares the space.
-      let stride = activePickerFrame.width / CGFloat(max(1, picker?.itemCount ?? 1))
-      let itemCenter = CGPoint(
-        x: activePickerFrame.minX + stride * (CGFloat(index) + 0.5),
-        y: activePickerFrame.midY
-      )
-      let flight = CGPoint(
-        x: activeTriggerFrame.midX - itemCenter.x,
-        y: activeTriggerFrame.midY - itemCenter.y
-      )
-      picker?.animateSelection(at: index, flight: flight, completion: teardown)
+      picker?.animateSelection(at: index, completion: teardown)
     } else {
       picker?.setFocusedIndex(nil)
       picker?.animateOut(completion: teardown)

@@ -51,9 +51,11 @@ final class ReactionsUITests: XCTestCase {
 
     let target = row(5)
     // The picker presents above the trigger, so the drag destination is up and
-    // across from where the press started.
+    // across from where the press started. It aims near the pill's middle: the
+    // last slot is the "another reaction" plus, which opens the emoji keyboard
+    // instead of committing, so a far-right destination would assert nothing.
     let start = target.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-    let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: -1.2))
+    let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: -1.2))
 
     start.press(forDuration: 0.6, thenDragTo: destination)
 

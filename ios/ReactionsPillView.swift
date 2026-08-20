@@ -24,6 +24,15 @@ private enum Metrics {
   static let neighborLift: CGFloat = 2
   static let neighborShift: CGFloat = 5
 
+  /// The divider between the consumer's reactions and the "another reaction"
+  /// section (custom pick + plus): a hairline with a gap either side. The
+  /// extra width it adds over a normal inter-item gap.
+  static let separatorLineWidth: CGFloat = 1
+  static let separatorGap: CGFloat = 8
+  static var separatorExtra: CGFloat {
+    separatorGap * 2 + separatorLineWidth - itemSpacing
+  }
+
   /// How far the chosen reaction overshoots past the focus scale when picked,
   /// before it flies down to the trigger. Capped by the raster headroom the
   /// same way `neighborScale` is — this is the one place a raster is shown
@@ -57,6 +66,62 @@ enum GlassSupport {
   }
 }
 
+// MARK: - Surface appearance
+
+/// The picker floats over arbitrary app content, so the system theme says
+/// nothing about what is actually behind it — a dark screen in a light-mode
+/// app got a light pill that all but vanished. The pixels behind the trigger
+/// decide instead: walking view background colours is defeated by React
+/// Native's view flattening (the painted colour often lives on no ancestor at
+/// all), so the trigger's on-screen region is sampled directly. One tiny
+/// render per open, at gesture-begin — never on the scroll or focus path.
+enum SurfaceAppearance {
+  static func isDark(under view: UIView) -> Bool {
+    let fallback = view.traitCollection.userInterfaceStyle == .dark
+    guard let window = view.window else { return fallback }
+    let rect = view.convert(view.bounds, to: window)
+      .intersection(window.bounds)
+    guard !rect.isEmpty, rect.width >= 1, rect.height >= 1 else { return fallback }
+
+    // The whole trigger area squashed into a handful of pixels: the average
+    // is wanted anyway, and the tiny target keeps the snapshot cheap.
+    let sample = CGSize(width: 4, height: 4)
+    let format = UIGraphicsImageRendererFormat.default()
+    format.scale = 1
+    let image = UIGraphicsImageRenderer(size: sample, format: format)
+      .image { context in
+        let cg = context.cgContext
+        cg.scaleBy(x: sample.width / rect.width, y: sample.height / rect.height)
+        cg.translateBy(x: -rect.minX, y: -rect.minY)
+        window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+      }
+
+    guard
+      let cgImage = image.cgImage,
+      let data = cgImage.dataProvider?.data,
+      let bytes = CFDataGetBytePtr(data)
+    else { return fallback }
+
+    let bytesPerPixel = max(1, cgImage.bitsPerPixel / 8)
+    var total: CGFloat = 0
+    var count = 0
+    for y in 0..<cgImage.height {
+      for x in 0..<cgImage.width {
+        let offset = y * cgImage.bytesPerRow + x * bytesPerPixel
+        // Channel order varies by format; for a dark-vs-light call an even
+        // average is as good as true luminance.
+        let a = CGFloat(bytes[offset])
+        let b = CGFloat(bytes[offset + 1])
+        let c = CGFloat(bytes[offset + 2])
+        total += (a + b + c) / (3 * 255)
+        count += 1
+      }
+    }
+    guard count > 0 else { return fallback }
+    return total / CGFloat(count) < 0.5
+  }
+}
+
 // MARK: - Renderable
 
 /// A reaction resolved down to what actually gets drawn. Resolution happens
@@ -75,9 +140,44 @@ final class ReactionsPillView: UIView {
   private var renderables: [Renderable] = []
   private var imageViews: [UIImageView] = []
 
+  /// Index of the first item after the section divider, or nil for no divider.
+  private var separatorAfter: Int?
+  private let separatorView = UIView()
+
   /// How many reactions are currently shown; the host uses it to recover the
   /// per-item stride when computing the selection flight vector.
   var itemCount: Int { imageViews.count }
+
+  // MARK: Slot geometry
+
+  /// Centre of slot `index` in the pill's own coordinates. Single source of
+  /// truth for layout, hit-testing, and the selection flight vector — slots
+  /// are not uniform once the separator inserts its extra width.
+  func slotCenterX(at index: Int) -> CGFloat {
+    var x = Metrics.contentInset
+      + CGFloat(index) * (Metrics.itemSize + Metrics.itemSpacing)
+      + Metrics.itemSize / 2
+    if let separatorAfter, index >= separatorAfter {
+      x += Metrics.separatorExtra
+    }
+    return x
+  }
+
+  /// The slot nearest the given local x, clamped to the row. The host has
+  /// already checked the point is inside the pill's (tolerance-inset) frame.
+  func slotIndex(atLocalX x: CGFloat) -> Int? {
+    guard !renderables.isEmpty else { return nil }
+    var best = 0
+    var bestDistance = CGFloat.greatestFiniteMagnitude
+    for index in renderables.indices {
+      let distance = abs(x - slotCenterX(at: index))
+      if distance < bestDistance {
+        best = index
+        bestDistance = distance
+      }
+    }
+    return best
+  }
 
   /// The capsule behind the reactions — a glass container on iOS 26, a blur
   /// view below that, an opaque view under Reduce Transparency.
@@ -148,8 +248,9 @@ final class ReactionsPillView: UIView {
 
   // MARK: Content
 
-  func apply(items: [Renderable], selectedId: String?) {
+  func apply(items: [Renderable], selectedId: String?, separatorAfter: Int?) {
     renderables = items
+    self.separatorAfter = separatorAfter
     rebuildItemViews()
     applySelection(selectedId)
     setNeedsLayout()
@@ -176,6 +277,10 @@ final class ReactionsPillView: UIView {
       addSubview(imageView)
       imageViews.append(imageView)
     }
+
+    separatorView.backgroundColor = UIColor.label.withAlphaComponent(0.25)
+    separatorView.isHidden = separatorAfter == nil
+    addSubview(separatorView)
   }
 
   // MARK: Animation
@@ -212,11 +317,24 @@ final class ReactionsPillView: UIView {
     // Grows from the bottom edge, which is the side nearest the trigger, so the
     // expansion reads as coming out of the row rather than appearing over it.
     layer.anchorPoint = CGPoint(x: 0.5, y: 1)
-    alpha = 0
+
+    // The pill's own alpha stays 1 throughout its lifetime. Fading it — or any
+    // ancestor of the effect view — renders the glass as a translucent grey
+    // snapshot until the fade completes, which read as "semi-transparent
+    // capsule first, real glass after". Nor is the glass *effect* animated:
+    // UIKit interpolates UIGlassEffect through the same frosted state. Glass
+    // is simply present from the first frame — the open's motion comes from
+    // the scale and the item cascade. Blur (pre-26) interpolates cleanly, so
+    // it alone fades by effect.
+    alpha = 1
+    if !usingGlass {
+      removeBackdropPresence()
+    }
+    separatorView.alpha = 0
 
     guard !reduceMotion else {
       transform = .identity
-      imageViews.forEach { $0.alpha = 1; $0.transform = .identity; $0.layer.zPosition = 0 }
+      imageViews.forEach { $0.alpha = 0; $0.transform = .identity; $0.layer.zPosition = 0 }
       return
     }
 
@@ -233,12 +351,17 @@ final class ReactionsPillView: UIView {
 
   func animateIn() {
     guard !reduceMotion else {
-      UIView.animate(withDuration: 0.15) { self.alpha = 1 }
+      UIView.animate(withDuration: 0.15) {
+        if !self.usingGlass { self.restoreBackdropPresence() }
+        self.separatorView.alpha = 1
+        self.imageViews.forEach { $0.alpha = 1 }
+      }
       return
     }
 
     let animator = spring(duration: 0.45, damping: 0.72) {
-      self.alpha = 1
+      if !self.usingGlass { self.restoreBackdropPresence() }
+      self.separatorView.alpha = 1
       self.transform = .identity
     }
     presentationAnimator = animator
@@ -259,7 +382,12 @@ final class ReactionsPillView: UIView {
 
   func animateOut(completion: @escaping () -> Void) {
     let animator = spring(duration: 0.25, damping: 1) {
-      self.alpha = 0
+      // Blur leaves by its effect; glass stays applied while the pill sinks
+      // and is detached whole at teardown — animating UIGlassEffect out plays
+      // the same frosted flash as animating it in.
+      if !self.usingGlass { self.removeBackdropPresence() }
+      self.separatorView.alpha = 0
+      self.imageViews.forEach { $0.alpha = 0 }
       if !self.reduceMotion {
         // Sinks back toward the trigger it grew out of — the inverse of the
         // open — rather than shrinking in place.
@@ -277,30 +405,25 @@ final class ReactionsPillView: UIView {
     animator.startAnimation()
   }
 
-  /// The selection celebration: everything that was not chosen shrinks away,
-  /// staggered outward from the choice; the chosen reaction pops past its focus
-  /// scale, then shrinks and flies along `flight` — the vector from its resting
-  /// position to the trigger — so the reaction reads as landing on the row that
-  /// was pressed. All transform and effect animation, no geometry (spec §6.5).
-  func animateSelection(
-    at index: Int,
-    flight: CGPoint,
-    completion: @escaping () -> Void
-  ) {
+  /// The selection celebration — a stamp: everything that was not chosen
+  /// shrinks away, staggered outward from the choice; the chosen reaction pops
+  /// past its focus scale, then presses back down in place and fades — like a
+  /// stamp lifting off the row. No flight across the screen: the consumer's
+  /// own UI reflects the selection at the same moment, and an emoji streaking
+  /// from the picker to the row read as a glitch rather than a celebration.
+  /// All transform and effect animation, no geometry (spec §6.5).
+  func animateSelection(at index: Int, completion: @escaping () -> Void) {
     guard !reduceMotion, index < imageViews.count else {
       animateOut(completion: completion)
       return
     }
 
-    // The capsule leaves first: glass fades by animating its effect away (the
-    // sanctioned fade for UIVisualEffectView), a solid backdrop by alpha, and
-    // both sink slightly as they go.
+    // The capsule leaves first: blur by animating its effect away, a solid
+    // backdrop by alpha, glass by sinking alone (its effect is never animated
+    // — that plays a frosted flash), and all sink slightly as they go.
     let backdropAnimator = spring(duration: 0.3, damping: 1) {
-      if let effectView = self.backdrop as? UIVisualEffectView {
-        effectView.effect = nil
-      } else {
-        self.backdrop.alpha = 0
-      }
+      if !self.usingGlass { self.removeBackdropPresence() }
+      self.separatorView.alpha = 0
       self.backdrop.transform = CGAffineTransform(translationX: 0, y: 4)
         .scaledBy(x: 0.9, y: 0.9)
     }
@@ -330,19 +453,19 @@ final class ReactionsPillView: UIView {
     itemAnimators.append(pop)
     pop.startAnimation()
 
-    // …then flies down to the trigger. This is the tracked animator: teardown
-    // is bound to its end, and a reopen mid-flight cancels it (spec §4.3).
-    let depart = spring(duration: 0.35, damping: 1) {
+    // …then presses back down in place and fades, like a stamp lifting off.
+    // This is the tracked animator: teardown is bound to its end, and a
+    // reopen mid-flight cancels it (spec §4.3).
+    let settle = spring(duration: 0.25, damping: 1) {
       chosen.alpha = 0
-      chosen.transform = CGAffineTransform(translationX: flight.x, y: flight.y)
-        .scaledBy(x: 0.2, y: 0.2)
+      chosen.transform = CGAffineTransform(scaleX: 1.0, y: 1.0)
     }
-    depart.addCompletion { [weak self] position in
+    settle.addCompletion { [weak self] position in
       self?.presentationAnimator = nil
       if position == .end { completion() }
     }
-    presentationAnimator = depart
-    depart.startAnimation(afterDelay: 0.18)
+    presentationAnimator = settle
+    settle.startAnimation(afterDelay: 0.18)
   }
 
   /// Puts the pooled instance back to a clean resting state after teardown, so
@@ -359,12 +482,33 @@ final class ReactionsPillView: UIView {
     }
   }
 
+  /// Brings the capsule on screen: blur by assigning its effect, a solid
+  /// backdrop by alpha. Never called for glass — glass is present from the
+  /// first frame and removed only at teardown, because UIKit interpolates
+  /// UIGlassEffect through a frosted state that reads as a grey flash.
+  private func restoreBackdropPresence() {
+    if let effectView = backdrop as? UIVisualEffectView {
+      effectView.effect = backdropEffect
+    } else {
+      backdrop.alpha = 1
+    }
+  }
+
+  private func removeBackdropPresence() {
+    if let effectView = backdrop as? UIVisualEffectView {
+      effectView.effect = nil
+    } else {
+      backdrop.alpha = 0
+    }
+  }
+
   private func restoreBackdrop() {
     if let effectView = backdrop as? UIVisualEffectView {
       effectView.effect = backdropEffect
     }
     backdrop.alpha = 1
     backdrop.transform = .identity
+    separatorView.alpha = 1
   }
 
   /// Highlights the reaction under the finger. Dock-style: the focused
@@ -446,10 +590,13 @@ final class ReactionsPillView: UIView {
   override var intrinsicContentSize: CGSize {
     let count = CGFloat(renderables.count)
     guard count > 0 else { return .zero }
-    let width =
+    var width =
       count * Metrics.itemSize
       + max(0, count - 1) * Metrics.itemSpacing
       + Metrics.contentInset * 2
+    if separatorAfter != nil {
+      width += Metrics.separatorExtra
+    }
     return CGSize(width: width, height: Metrics.itemSize + Metrics.contentInset * 2)
   }
 
@@ -470,17 +617,28 @@ final class ReactionsPillView: UIView {
     // scale transform while focused, and assigning `frame` to a transformed
     // view is undefined and clobbers the running animation.
     let size = CGSize(width: Metrics.itemSize, height: Metrics.itemSize)
-    var x = Metrics.contentInset
 
-    for imageView in imageViews {
-      let center = CGPoint(x: x + Metrics.itemSize / 2, y: bounds.height / 2)
+    for (index, imageView) in imageViews.enumerated() {
+      let center = CGPoint(x: slotCenterX(at: index), y: bounds.height / 2)
       if imageView.bounds.size != size {
         imageView.bounds = CGRect(origin: .zero, size: size)
       }
       if imageView.center != center {
         imageView.center = center
       }
-      x += Metrics.itemSize + Metrics.itemSpacing
+    }
+
+    if let separatorAfter {
+      // Centred in the widened gap before the first "another reaction" slot.
+      let lineX = slotCenterX(at: separatorAfter)
+        - Metrics.itemSize / 2 - Metrics.separatorGap
+        - Metrics.separatorLineWidth / 2
+      separatorView.bounds = CGRect(
+        x: 0, y: 0,
+        width: Metrics.separatorLineWidth, height: Metrics.itemSize * 0.6
+      )
+      separatorView.center = CGPoint(x: lineX, y: bounds.height / 2)
+      separatorView.layer.cornerRadius = Metrics.separatorLineWidth / 2
     }
   }
 
@@ -549,6 +707,33 @@ private enum ReactionRasteriser {
 /// otherwise emoji — which is required on every item, so this never yields
 /// nothing to draw. Shared by the standalone view and the host.
 enum ReactionResolver {
+  /// The synthetic id carried by the trailing "another reaction" plus item.
+  /// Never reported through onSelect — releasing on it opens the emoji picker.
+  static let anotherReactionId = "__another_reaction__"
+
+  /// The plus is chrome, not a reaction: it renders as a symbol regardless of
+  /// `renderMode`, since it represents the picker itself rather than content.
+  static func anotherReactionRenderable() -> Renderable {
+    Renderable(
+      id: anotherReactionId,
+      image: ReactionRasteriser.symbol("plus"),
+      isSymbol: true,
+      accessibilityLabel: "Add another reaction"
+    )
+  }
+
+  /// The custom emoji previously picked through "another reaction". Its id is
+  /// the emoji itself — it exists in no item list, so the emoji is the only
+  /// stable identity it has.
+  static func customRenderable(emoji: String) -> Renderable {
+    Renderable(
+      id: emoji,
+      image: ReactionRasteriser.emoji(emoji),
+      isSymbol: false,
+      accessibilityLabel: emoji
+    )
+  }
+
   static func resolve(
     _ items: [NativeReactionItem],
     renderMode: ReactionRenderMode

@@ -112,4 +112,8 @@ dependencies {
   // Spring physics for the expand/collapse and focus animations (spec §4.5).
   // Small and dependency-free; it is not a peer dependency of the package.
   implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
+  // The platform's own emoji picker UI, used by the "another reaction" plus
+  // item. Android has no system-provided picker dialog; this androidx view is
+  // the sanctioned equivalent.
+  implementation "androidx.emoji2:emoji2-emojipicker:1.5.0"
 }

@@ -12,13 +12,19 @@ type SelectListener = (reactionId: ReactionId | null) => void;
 
 const listeners = new Map<
   string,
-  { onSelect: SelectListener; onOpen?: () => void; onClose?: () => void }
+  {
+    onSelect: SelectListener;
+    onSelectAnother?: (emoji: string) => void;
+    onOpen?: () => void;
+    onClose?: () => void;
+  }
 >();
 
 export function addTriggerListener(
   triggerId: string,
   entry: {
     onSelect: SelectListener;
+    onSelectAnother?: (emoji: string) => void;
     onOpen?: () => void;
     onClose?: () => void;
   }
@@ -39,6 +45,9 @@ function wireCallbacksOnce(): void {
   host.setOnSelect((triggerId, reactionId) => {
     listeners.get(triggerId)?.onSelect(reactionId ?? null);
   });
+  host.setOnSelectAnother((triggerId, emoji) => {
+    listeners.get(triggerId)?.onSelectAnother?.(emoji);
+  });
   host.setOnOpen((triggerId) => {
     listeners.get(triggerId)?.onOpen?.();
   });
@@ -52,6 +61,13 @@ export interface ReactionsPickerHostProps {
   readonly renderMode?: ReactionRenderMode;
   /** Milliseconds before the picker opens. Default 200. */
   readonly longPressDuration?: number;
+  /**
+   * Global switch for the "another reaction" plus item that opens the native
+   * emoji picker. Default `true`. A trigger only shows the plus when this is
+   * on, it supplies an `onSelectAnother` handler, and it does not opt out via
+   * its own `anotherReactionEnabled` prop.
+   */
+  readonly anotherReactionEnabled?: boolean;
 }
 
 /**
@@ -66,19 +82,20 @@ export interface ReactionsPickerHostProps {
 export function ReactionsPickerHost({
   renderMode = 'auto',
   longPressDuration = 200,
+  anotherReactionEnabled = true,
 }: ReactionsPickerHostProps) {
   const activeRef = useRef(false);
 
   useEffect(() => {
     wireCallbacksOnce();
-    host.activate(renderMode, longPressDuration);
+    host.activate(renderMode, longPressDuration, anotherReactionEnabled);
     activeRef.current = true;
 
     return () => {
       activeRef.current = false;
       host.deactivate();
     };
-  }, [renderMode, longPressDuration]);
+  }, [renderMode, longPressDuration, anotherReactionEnabled]);
 
   return null;
 }
