@@ -31,7 +31,12 @@ private data class TriggerRegistration(
      */
     var anotherReaction: Boolean?,
     /** The custom emoji previously picked through "another reaction", if any. */
-    var anotherSelected: String?
+    var anotherSelected: String?,
+    /**
+     * Per-trigger appearance for the "another reaction" item; null inherits the
+     * host-wide one. Replaces it outright rather than merging into it.
+     */
+    var anotherAppearance: NativeAnotherReaction?
 ) {
     override fun equals(other: Any?) = this === other
     override fun hashCode() = viewTag
@@ -53,6 +58,12 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private var renderMode = ReactionRenderMode.AUTO
     private var longPressMs = 200L
     private var anotherReactionEnabled = true
+
+    /**
+     * Host-wide appearance for the "another reaction" item; null keeps the
+     * built-in chrome.
+     */
+    private var anotherReactionAppearance: NativeAnotherReaction? = null
 
     /** Owns the emoji-picker dialog opened by the trailing plus item. */
     private val emojiSheet = AnotherReactionSheet()
@@ -93,11 +104,13 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     override fun activate(
         renderMode: ReactionRenderMode,
         longPressDurationMs: Double,
-        anotherReactionEnabled: Boolean
+        anotherReactionEnabled: Boolean,
+        anotherReactionAppearance: NativeAnotherReaction?
     ) {
         this.renderMode = renderMode
         this.longPressMs = longPressDurationMs.toLong()
         this.anotherReactionEnabled = anotherReactionEnabled
+        this.anotherReactionAppearance = anotherReactionAppearance
         main.post { install() }
     }
 
@@ -121,12 +134,15 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         items: Array<NativeReactionItem>,
         selectedId: String?,
         anotherReaction: Boolean?,
-        anotherSelected: String?
+        anotherSelected: String?,
+        anotherReactionAppearance: NativeAnotherReaction?
     ) {
         val tag = viewTag.toInt()
         main.post {
-            registrations[triggerId] =
-                TriggerRegistration(tag, items, selectedId, anotherReaction, anotherSelected)
+            registrations[triggerId] = TriggerRegistration(
+                tag, items, selectedId, anotherReaction, anotherSelected,
+                anotherReactionAppearance
+            )
             triggerIdByTag[tag] = triggerId
         }
     }
@@ -136,7 +152,8 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         items: Array<NativeReactionItem>,
         selectedId: String?,
         anotherReaction: Boolean?,
-        anotherSelected: String?
+        anotherSelected: String?,
+        anotherReactionAppearance: NativeAnotherReaction?
     ) {
         main.post {
             registrations[triggerId]?.let {
@@ -144,6 +161,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
                 it.selectedId = selectedId
                 it.anotherReaction = anotherReaction
                 it.anotherSelected = anotherSelected
+                it.anotherAppearance = anotherReactionAppearance
             }
         }
     }
@@ -371,11 +389,12 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         triggerView.parent?.requestDisallowInterceptTouchEvent(true)
 
         // The pill matches the surface it floats over, not the system theme.
-        // Set before applyItems: the plus glyph rasterises in this appearance.
+        // Set before applyItems: the dashed-emoji glyph rasterises in this appearance.
         pill.setSurfaceAppearance(isDarkSurface(triggerView))
         pill.applyItems(
             registration.items, registration.selectedId, renderMode,
-            if (activeShowsPlus) custom else null, activeShowsPlus
+            if (activeShowsPlus) custom else null, activeShowsPlus,
+            registration.anotherAppearance ?: anotherReactionAppearance
         )
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         pill.measure(unspecified, unspecified)

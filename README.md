@@ -1,5 +1,17 @@
 <img src="assets/banner.png" alt="react-native-glass-reactions — fully native reactions picker for React Native" width="100%">
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/react-native-glass-reactions"><img alt="npm version" src="https://img.shields.io/npm/v/react-native-glass-reactions?style=flat-square"></a>
+  <a href="https://www.npmjs.com/package/react-native-glass-reactions"><img alt="npm downloads" src="https://img.shields.io/npm/dm/react-native-glass-reactions?style=flat-square"></a>
+  <a href="https://github.com/MGasowski/react-native-glass-reactions/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/MGasowski/react-native-glass-reactions/ci.yml?branch=main&style=flat-square"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/npm/l/react-native-glass-reactions?style=flat-square"></a>
+  <br>
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-iOS%20%7C%20Android-lightgrey?style=flat-square">
+  <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.80%2B-61DAFB?style=flat-square&logo=react&logoColor=white">
+  <img alt="New Architecture" src="https://img.shields.io/badge/New%20Architecture-required-blue?style=flat-square">
+  <img alt="Xcode" src="https://img.shields.io/badge/Xcode-26%2B-147EFB?style=flat-square&logo=xcode&logoColor=white">
+</p>
+
 An Instagram-style reactions picker rendered as a **fully native view** — Swift on iOS, Kotlin on Android. The long-press, drag and select interaction and every animation run natively. JavaScript is involved twice per interaction: once at mount, once at selection.
 
 On iOS 26 the picker is drawn with the system **Liquid Glass** material. On older iOS and on Android it degrades to a defined flat surface. It never crashes and never fails a build on an unsupported OS.
@@ -126,6 +138,30 @@ The plus renders only when there is somewhere for the pick to go — no handler,
 
 - **Globally:** `<ReactionsPickerHost anotherReactionEnabled={false} />`
 - **Per picker:** `<ReactionTrigger anotherReactionEnabled={false} … />` (overrides the global in either direction)
+
+#### Customising the ＋ item
+
+The default glyph is a dashed emoji with a plus badge, and its label is the English `"Add another reaction"`. Both are overridable — globally on the host, or per picker on the trigger:
+
+```tsx
+<ReactionsPickerHost
+  anotherReactionAppearance={{
+    symbol: { ios: 'plus.magnifyingglass' },
+    emoji: '➕',
+    badge: false,
+    accessibilityLabel: t('reactions.addAnother'),
+  }}
+/>
+```
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `symbol` | dashed face (`face.dashed`, `circle.dashed` on iOS 15) | iOS only. `symbol.android` is accepted but ignored in 1.x — Android renders emoji only, exactly as it does for items. |
+| `emoji` | — | Used when no symbol renders, and forced under `renderMode="emoji"`. The only way to change the Android glyph. |
+| `badge` | `true` | The corner plus. Only drawn over a symbol: an emoji already reads as a picked reaction, so badging it reads wrong. |
+| `accessibilityLabel` | `"Add another reaction"` | Supply a localized string. |
+
+Every field is optional, and if nothing resolves the built-in glyph draws — the slot never blanks. A trigger's object **replaces** the host's rather than merging into it, so a per-picker override starts from the built-in defaults, not from the global object.
 
 <p align="center">
   <img src="assets/demo-another-reaction.gif" alt="Dragging to the plus opens the system emoji keyboard; the picked emoji returns as a custom slot before the plus" width="300">

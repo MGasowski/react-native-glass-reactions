@@ -1,11 +1,19 @@
 import { useEffect, useId, useRef, type ComponentRef } from 'react';
 import { findNodeHandle, View, type ViewProps } from 'react-native';
+import {
+  anotherReactionKey,
+  toNativeAnotherReaction,
+} from './another-reaction';
 import { host } from './host';
 import {
   addTriggerListener,
   removeTriggerListener,
 } from './reactions-picker-host';
-import type { ReactionId, ReactionItem } from './types';
+import type {
+  AnotherReactionAppearance,
+  ReactionId,
+  ReactionItem,
+} from './types';
 
 export interface ReactionTriggerProps extends ViewProps {
   readonly items: readonly ReactionItem[];
@@ -30,6 +38,12 @@ export interface ReactionTriggerProps extends ViewProps {
    * the `ReactionsPickerHost` global; `false` hides the plus on this trigger.
    */
   readonly anotherReactionEnabled?: boolean;
+  /**
+   * Per-picker appearance for the "another reaction" item. Unset inherits the
+   * `ReactionsPickerHost` object; supplying one replaces it outright rather
+   * than merging into it.
+   */
+  readonly anotherReactionAppearance?: AnotherReactionAppearance;
   readonly onOpen?: () => void;
   readonly onClose?: () => void;
   readonly disabled?: boolean;
@@ -52,6 +66,7 @@ export function ReactionTrigger({
   onSelectAnother,
   anotherSelected,
   anotherReactionEnabled,
+  anotherReactionAppearance,
   onOpen,
   onClose,
   disabled = false,
@@ -72,6 +87,9 @@ export function ReactionTrigger({
   // wins, and `undefined` defers to the host's global setting.
   const anotherReaction =
     onSelectAnother == null ? false : anotherReactionEnabled;
+
+  const nativeAppearance = toNativeAnotherReaction(anotherReactionAppearance);
+  const appearanceKey = anotherReactionKey(anotherReactionAppearance);
 
   const nativeItems = items.map((item) => ({
     id: item.id,
@@ -99,7 +117,8 @@ export function ReactionTrigger({
       nativeItems,
       selected,
       anotherReaction,
-      anotherSelected
+      anotherSelected,
+      nativeAppearance
     );
     registeredRef.current = true;
 
@@ -123,10 +142,18 @@ export function ReactionTrigger({
       nativeItems,
       selected,
       anotherReaction,
-      anotherSelected
+      anotherSelected,
+      nativeAppearance
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerId, selected, anotherReaction, anotherSelected, nativeItemsKey]);
+  }, [
+    triggerId,
+    selected,
+    anotherReaction,
+    anotherSelected,
+    nativeItemsKey,
+    appearanceKey,
+  ]);
 
   return (
     <View ref={viewRef} collapsable={false} {...viewProps}>

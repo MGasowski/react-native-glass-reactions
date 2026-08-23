@@ -698,6 +698,74 @@ private enum ReactionRasteriser {
     )
     return UIImage(systemName: name, withConfiguration: configuration)
   }
+
+  /// Chrome for the trailing "another reaction" item: by default a dashed
+  /// emoji with a plus badge in the corner, so it reads as "pick any emoji"
+  /// rather than one more reaction. Template-rendered so it tints with `.label`
+  /// like other symbols.
+  ///
+  /// `symbolName` overrides the glyph; `nil` uses the built-in dashed face
+  /// (`face.dashed` is iOS 16+, `circle.dashed` covers 15). Returns `nil` when
+  /// a supplied name resolves to no symbol, which is the caller's cue to fall
+  /// back to emoji.
+  static func anotherReaction(symbolName: String? = nil, badge: Bool = true) -> UIImage? {
+    let side = Metrics.rasterSize
+
+    let resolvedName: String
+    if let symbolName, !symbolName.isEmpty {
+      guard UIImage(systemName: symbolName) != nil else { return nil }
+      resolvedName = symbolName
+    } else {
+      resolvedName = UIImage(systemName: "face.dashed") != nil
+        ? "face.dashed"
+        : "circle.dashed"
+    }
+
+    let format = UIGraphicsImageRendererFormat.preferred()
+    format.opaque = false
+    let renderer = UIGraphicsImageRenderer(
+      size: CGSize(width: side, height: side),
+      format: format
+    )
+
+    let face = UIImage(
+      systemName: resolvedName,
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: side * 0.56, weight: .medium)
+    )
+    let plus = UIImage(
+      systemName: "plus.circle.fill",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: side * 0.32, weight: .bold)
+    )
+
+    let image = renderer.image { context in
+      let ctx = context.cgContext
+      // Without the badge the glyph owns the whole tile: nothing has to be left
+      // clear in the corner, so it can be drawn at the size a lone symbol wants.
+      let faceSize = side * (badge ? 0.78 : 0.92)
+      let faceRect = CGRect(
+        x: badge ? side * 0.05 : (side - faceSize) / 2,
+        y: badge ? side * 0.02 : (side - faceSize) / 2,
+        width: faceSize,
+        height: faceSize
+      )
+      face?.withTintColor(.black, renderingMode: .alwaysTemplate).draw(in: faceRect)
+
+      guard badge else { return }
+      let badgeSize = side * 0.40
+      let badgeRect = CGRect(
+        x: side - badgeSize - side * 0.02,
+        y: side - badgeSize - side * 0.02,
+        width: badgeSize,
+        height: badgeSize
+      )
+      // Gap so the badge sits on the dashed face rather than merging with it.
+      ctx.setBlendMode(.clear)
+      ctx.fillEllipse(in: badgeRect.insetBy(dx: -side * 0.045, dy: -side * 0.045))
+      ctx.setBlendMode(.normal)
+      plus?.withTintColor(.black, renderingMode: .alwaysTemplate).draw(in: badgeRect)
+    }
+    return image.withRenderingMode(.alwaysTemplate)
+  }
 }
 
 // MARK: - Resolution
@@ -711,14 +779,45 @@ enum ReactionResolver {
   /// Never reported through onSelect — releasing on it opens the emoji picker.
   static let anotherReactionId = "__another_reaction__"
 
-  /// The plus is chrome, not a reaction: it renders as a symbol regardless of
-  /// `renderMode`, since it represents the picker itself rather than content.
-  static func anotherReactionRenderable() -> Renderable {
-    Renderable(
-      id: anotherReactionId,
-      image: ReactionRasteriser.symbol("plus"),
-      isSymbol: true,
-      accessibilityLabel: "Add another reaction"
+  /// Default label for the "another reaction" item when the consumer supplies
+  /// none. English-only, which is why `accessibilityLabel` is overridable.
+  static let anotherReactionLabel = "Add another reaction"
+
+  /// The item is chrome, not a reaction, so with no override it renders as a
+  /// symbol regardless of `renderMode` — it represents the picker itself rather
+  /// than content. An override goes through the same fallback chain as items:
+  /// symbol first where one is supplied and resolves, else emoji. When neither
+  /// yields an image the built-in glyph does, so the slot never blanks.
+  static func anotherReactionRenderable(
+    appearance: NativeAnotherReaction?,
+    renderMode: ReactionRenderMode
+  ) -> Renderable {
+    let label = appearance?.accessibilityLabel ?? anotherReactionLabel
+    let badge = appearance?.badge ?? true
+    let emoji = appearance?.emoji.flatMap { $0.isEmpty ? nil : $0 }
+
+    func renderable(_ image: UIImage?, isSymbol: Bool) -> Renderable {
+      Renderable(
+        id: anotherReactionId,
+        image: image,
+        isSymbol: isSymbol,
+        accessibilityLabel: label
+      )
+    }
+
+    if renderMode == .emoji, let emoji {
+      return renderable(ReactionRasteriser.emoji(emoji), isSymbol: false)
+    }
+    if let name = appearance?.symbolIos, !name.isEmpty,
+       let image = ReactionRasteriser.anotherReaction(symbolName: name, badge: badge) {
+      return renderable(image, isSymbol: true)
+    }
+    if let emoji {
+      return renderable(ReactionRasteriser.emoji(emoji), isSymbol: false)
+    }
+    return renderable(
+      ReactionRasteriser.anotherReaction(badge: badge),
+      isSymbol: true
     )
   }
 

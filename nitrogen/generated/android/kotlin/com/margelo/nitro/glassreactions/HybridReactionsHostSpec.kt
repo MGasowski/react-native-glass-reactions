@@ -33,7 +33,7 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun activate(renderMode: ReactionRenderMode, longPressDurationMs: Double, anotherReactionEnabled: Boolean): Unit
+  abstract fun activate(renderMode: ReactionRenderMode, longPressDurationMs: Double, anotherReactionEnabled: Boolean, anotherReactionAppearance: NativeAnotherReaction?): Unit
   
   @DoNotStrip
   @Keep
@@ -41,11 +41,11 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun registerTrigger(triggerId: String, viewTag: Double, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?): Unit
+  abstract fun registerTrigger(triggerId: String, viewTag: Double, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?): Unit
   
   @DoNotStrip
   @Keep
-  abstract fun updateTrigger(triggerId: String, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?): Unit
+  abstract fun updateTrigger(triggerId: String, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?): Unit
   
   @DoNotStrip
   @Keep

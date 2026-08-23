@@ -12,6 +12,9 @@ private struct TriggerRegistration {
   var anotherReaction: Bool?
   /// The custom emoji previously picked through "another reaction", if any.
   var anotherSelected: String?
+  /// Per-trigger appearance for the "another reaction" item; `nil` inherits the
+  /// host-wide one. Replaces it outright rather than merging into it.
+  var anotherAppearance: NativeAnotherReaction?
 }
 
 private enum Layout {
@@ -51,6 +54,9 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
   private var renderMode: ReactionRenderMode = .auto
   private var anotherReactionEnabled = true
+  /// Host-wide appearance for the "another reaction" item; `nil` keeps the
+  /// built-in chrome.
+  private var anotherReactionAppearance: NativeAnotherReaction?
 
   /// Owns the hidden text field that summons the system emoji keyboard —
   /// iOS has no standalone emoji picker API, so the keyboard *is* the native
@@ -77,13 +83,15 @@ class HybridReactionsHost: HybridReactionsHostSpec {
   func activate(
     renderMode: ReactionRenderMode,
     longPressDurationMs: Double,
-    anotherReactionEnabled: Bool
+    anotherReactionEnabled: Bool,
+    anotherReactionAppearance: NativeAnotherReaction?
   ) throws {
     let duration = longPressDurationMs
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.renderMode = renderMode
       self.anotherReactionEnabled = anotherReactionEnabled
+      self.anotherReactionAppearance = anotherReactionAppearance
       self.installRecognizer(minimumPressDuration: duration / 1000.0)
       self.warmPicker()
     }
@@ -111,14 +119,16 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     items: [NativeReactionItem],
     selectedId: String?,
     anotherReaction: Bool?,
-    anotherSelected: String?
+    anotherSelected: String?,
+    anotherReactionAppearance: NativeAnotherReaction?
   ) throws {
     let tag = Int(viewTag)
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.registrations[triggerId] = TriggerRegistration(
         viewTag: tag, items: items, selectedId: selectedId,
-        anotherReaction: anotherReaction, anotherSelected: anotherSelected
+        anotherReaction: anotherReaction, anotherSelected: anotherSelected,
+        anotherAppearance: anotherReactionAppearance
       )
       self.triggerIdByTag[tag] = triggerId
     }
@@ -129,7 +139,8 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     items: [NativeReactionItem],
     selectedId: String?,
     anotherReaction: Bool?,
-    anotherSelected: String?
+    anotherSelected: String?,
+    anotherReactionAppearance: NativeAnotherReaction?
   ) throws {
     DispatchQueue.main.async { [weak self] in
       guard let self, var existing = self.registrations[triggerId] else { return }
@@ -137,6 +148,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       existing.selectedId = selectedId
       existing.anotherReaction = anotherReaction
       existing.anotherSelected = anotherSelected
+      existing.anotherAppearance = anotherReactionAppearance
       self.registrations[triggerId] = existing
     }
   }
@@ -319,7 +331,10 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       if let emoji = registration.anotherSelected, !emoji.isEmpty {
         renderables.append(ReactionResolver.customRenderable(emoji: emoji))
       }
-      renderables.append(ReactionResolver.anotherReactionRenderable())
+      renderables.append(ReactionResolver.anotherReactionRenderable(
+        appearance: registration.anotherAppearance ?? anotherReactionAppearance,
+        renderMode: renderMode
+      ))
     }
     // Divider between the consumer's reactions and the "another reaction"
     // section, drawn only when both sides exist.
