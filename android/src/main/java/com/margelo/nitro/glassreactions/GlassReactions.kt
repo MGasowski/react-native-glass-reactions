@@ -3,9 +3,13 @@ package com.margelo.nitro.glassreactions
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.content.res.Configuration
 import android.provider.Settings
-import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.View
@@ -234,7 +238,8 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
         selectedId: String?,
         @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode,
         customEmoji: String?,
-        showPlus: Boolean
+        showPlus: Boolean,
+        anotherAppearance: NativeAnotherReaction? = null
     ) {
         val renderables = items.map {
             Renderable(it.id, rasteriseEmoji(it.emoji), it.accessibilityLabel)
@@ -247,10 +252,21 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
                     Renderable(customEmoji, rasteriseEmoji(customEmoji), customEmoji)
                 )
             }
-            // The plus is chrome, not a reaction: drawn rather than an emoji, so
-            // it reads as part of the picker instead of one more choice.
+            // The item is chrome, not a reaction: drawn rather than taken from
+            // an emoji font, so it reads as part of the picker instead of one
+            // more choice. A consumer-supplied emoji replaces the drawing —
+            // `symbolAndroid` cannot, for the same reason items ignore it here.
+            val overrideEmoji = anotherAppearance?.emoji?.takeIf { it.isNotEmpty() }
             renderables.add(
-                Renderable(ANOTHER_REACTION_ID, rasterisePlus(), "Add another reaction")
+                Renderable(
+                    ANOTHER_REACTION_ID,
+                    if (overrideEmoji != null) {
+                        rasteriseEmoji(overrideEmoji)
+                    } else {
+                        rasteriseAnotherReaction(anotherAppearance?.badge ?: true)
+                    },
+                    anotherAppearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
+                )
             )
         }
         // Divider between the consumer's reactions and the "another reaction"
@@ -265,6 +281,12 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
          * Never reported through onSelect — releasing on it opens the picker.
          */
         const val ANOTHER_REACTION_ID = "__another_reaction__"
+
+        /**
+         * Default label for the "another reaction" item. English-only, which is
+         * why `accessibilityLabel` is overridable.
+         */
+        const val ANOTHER_REACTION_LABEL = "Add another reaction"
     }
 
     /**
@@ -622,24 +644,103 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     }
 
     /**
-     * The plus glyph for the "another reaction" item, drawn with strokes rather
-     * than rasterised from a font so its weight and colour are controlled —
-     * matching the semibold SF Symbol used on iOS.
+     * Chrome for the trailing "another reaction" item: a dashed emoji
+     * silhouette, by default with a plus badge in the corner. Drawn rather than
+     * taken from a font so weight, colour, and the knockout plus match the iOS
+     * glyph.
      */
-    private fun rasterisePlus(): Bitmap {
+    private fun rasteriseAnotherReaction(badge: Boolean = true): Bitmap {
         val side = (itemSize * Metrics.MAX_FOCUS_SCALE).toInt().coerceAtLeast(1)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isDarkAppearance) Color.WHITE else Color.argb(0xFF, 0x1C, 0x1C, 0x1E)
-            strokeWidth = side * 0.09f
-            strokeCap = Paint.Cap.ROUND
+        val s = side.toFloat()
+        val color = if (isDarkAppearance) {
+            Color.WHITE
+        } else {
+            Color.argb(0xFF, 0x1C, 0x1C, 0x1E)
         }
 
         val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val center = side / 2f
-        val arm = side * 0.22f
-        canvas.drawLine(center - arm, center, center + arm, center, paint)
-        canvas.drawLine(center, center - arm, center, center + arm, paint)
+
+        // Without the badge the glyph owns the whole tile: nothing has to be
+        // left clear in the corner, so it is drawn larger and centred.
+        val bodySize = s * if (badge) 0.70f else 0.84f
+        val bodyLeft = if (badge) s * 0.10f else (s - bodySize) / 2f
+        val bodyTop = if (badge) s * 0.06f else (s - bodySize) / 2f
+        val bodyRect = RectF(bodyLeft, bodyTop, bodyLeft + bodySize, bodyTop + bodySize)
+        val dash = DashPathEffect(floatArrayOf(s * 0.10f, s * 0.065f), 0f)
+        val body = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = s * 0.055f
+            strokeCap = Paint.Cap.ROUND
+            pathEffect = dash
+        }
+        canvas.drawOval(bodyRect, body)
+
+        val fillFace = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.FILL
+        }
+        val eyeR = bodySize * 0.055f
+        val eyeY = bodyRect.top + bodySize * 0.38f
+        val eyeSpread = bodySize * 0.13f
+        canvas.drawCircle(bodyRect.centerX() - eyeSpread, eyeY, eyeR, fillFace)
+        canvas.drawCircle(bodyRect.centerX() + eyeSpread, eyeY, eyeR, fillFace)
+
+        // Solid smile: a dashed arc at this size collapses into specks.
+        val smile = Paint(body).apply {
+            pathEffect = null
+            strokeWidth = s * 0.055f * 0.85f
+        }
+        val smileRect = RectF(
+            bodyRect.centerX() - bodySize * 0.25f,
+            bodyRect.centerY() - bodySize * 0.16f,
+            bodyRect.centerX() + bodySize * 0.15f,
+            bodyRect.centerY() + bodySize * 0.24f
+        )
+        canvas.drawArc(smileRect, 20f, 140f, false, smile)
+
+        if (!badge) return bitmap
+
+        val badgeSize = s * 0.38f
+        val badgeRect = RectF(
+            s - badgeSize - s * 0.03f,
+            s - badgeSize - s * 0.03f,
+            s - s * 0.03f,
+            s - s * 0.03f
+        )
+
+        val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        }
+        val knockoutPad = s * 0.05f
+        canvas.drawOval(
+            RectF(
+                badgeRect.left - knockoutPad,
+                badgeRect.top - knockoutPad,
+                badgeRect.right + knockoutPad,
+                badgeRect.bottom + knockoutPad
+            ),
+            clear
+        )
+
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.FILL
+        }
+        canvas.drawOval(badgeRect, fill)
+
+        val plus = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+            style = Paint.Style.STROKE
+            strokeWidth = badgeSize * 0.14f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val cx = badgeRect.centerX()
+        val cy = badgeRect.centerY()
+        val arm = badgeSize * 0.22f
+        canvas.drawLine(cx - arm, cy, cx + arm, cy, plus)
+        canvas.drawLine(cx, cy - arm, cx, cy + arm, plus)
         return bitmap
     }
 }

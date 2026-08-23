@@ -15,14 +15,17 @@
 
 // Forward declaration of `ReactionRenderMode` to properly resolve imports.
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
+// Forward declaration of `NativeAnotherReaction` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeAnotherReaction; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
 #include "ReactionRenderMode.hpp"
+#include "NativeAnotherReaction.hpp"
+#include <optional>
 #include <string>
 #include "NativeReactionItem.hpp"
 #include <vector>
-#include <optional>
 #include <functional>
 
 namespace margelo::nitro::glassreactions {
@@ -56,10 +59,10 @@ namespace margelo::nitro::glassreactions {
 
     public:
       // Methods
-      virtual void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) = 0;
+      virtual void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) = 0;
       virtual void deactivate() = 0;
-      virtual void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) = 0;
-      virtual void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) = 0;
+      virtual void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) = 0;
+      virtual void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) = 0;
       virtual void unregisterTrigger(const std::string& triggerId) = 0;
       virtual void setOnSelect(const std::function<void(const std::string& /* triggerId */, const std::optional<std::string>& /* reactionId */)>& callback) = 0;
       virtual void setOnSelectAnother(const std::function<void(const std::string& /* triggerId */, const std::string& /* emoji */)>& callback) = 0;

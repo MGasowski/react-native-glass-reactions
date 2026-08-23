@@ -1,6 +1,14 @@
 import { useEffect, useRef } from 'react';
+import {
+  anotherReactionKey,
+  toNativeAnotherReaction,
+} from './another-reaction';
 import { host } from './host';
-import type { ReactionId, ReactionRenderMode } from './types';
+import type {
+  AnotherReactionAppearance,
+  ReactionId,
+  ReactionRenderMode,
+} from './types';
 
 /**
  * Callbacks are held in a module-level registry keyed by trigger id rather than
@@ -68,6 +76,13 @@ export interface ReactionsPickerHostProps {
    * its own `anotherReactionEnabled` prop.
    */
   readonly anotherReactionEnabled?: boolean;
+  /**
+   * Appearance of the "another reaction" item everywhere. Unset keeps the
+   * built-in dashed-emoji-with-a-plus glyph. A `ReactionTrigger` may replace it
+   * with its own — the objects are not merged field by field, so the trigger's
+   * defaults are the built-in ones rather than this object's.
+   */
+  readonly anotherReactionAppearance?: AnotherReactionAppearance;
 }
 
 /**
@@ -83,19 +98,29 @@ export function ReactionsPickerHost({
   renderMode = 'auto',
   longPressDuration = 200,
   anotherReactionEnabled = true,
+  anotherReactionAppearance,
 }: ReactionsPickerHostProps) {
   const activeRef = useRef(false);
+  const appearanceKey = anotherReactionKey(anotherReactionAppearance);
 
   useEffect(() => {
     wireCallbacksOnce();
-    host.activate(renderMode, longPressDuration, anotherReactionEnabled);
+    host.activate(
+      renderMode,
+      longPressDuration,
+      anotherReactionEnabled,
+      toNativeAnotherReaction(anotherReactionAppearance)
+    );
     activeRef.current = true;
 
     return () => {
       activeRef.current = false;
       host.deactivate();
     };
-  }, [renderMode, longPressDuration, anotherReactionEnabled]);
+    // Keyed on the appearance's content: a fresh object literal every render
+    // must not tear the recognizer down and reinstall it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renderMode, longPressDuration, anotherReactionEnabled, appearanceKey]);
 
   return null;
 }

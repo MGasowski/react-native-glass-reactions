@@ -29,6 +29,24 @@ export interface NativeReactionItem {
 }
 
 /**
+ * Flattened appearance of the trailing "another reaction" item. Every field is
+ * optional: this whole struct is absent unless the consumer overrides the
+ * built-in chrome, and each unset field keeps its native default.
+ */
+export interface NativeAnotherReaction {
+  /** SF Symbol name, iOS only. */
+  symbolIos?: string;
+  /** Material Symbol name, Android only — unused in 1.x (emoji-only there). */
+  symbolAndroid?: string;
+  /** Fallback when no symbol renders, and the forced form under `emoji` mode. */
+  emoji?: string;
+  /** The corner plus badge. Default true. Only drawn over a symbol. */
+  badge?: boolean;
+  /** Default "Add another reaction". */
+  accessibilityLabel?: string;
+}
+
+/**
  * Process-wide host singleton. This is what makes the single-picker guarantee
  * structural rather than a matter of consumer discipline (spec §4.3): the
  * instance lives here, not in the React tree, so no arrangement of components
@@ -50,7 +68,8 @@ export interface ReactionsHost extends HybridObject<{
   activate(
     renderMode: ReactionRenderMode,
     longPressDurationMs: number,
-    anotherReactionEnabled: boolean
+    anotherReactionEnabled: boolean,
+    anotherReactionAppearance?: NativeAnotherReaction
   ): void;
 
   /** Tears down the recognizer and releases the pooled picker. */
@@ -62,7 +81,8 @@ export interface ReactionsHost extends HybridObject<{
     items: NativeReactionItem[],
     selectedId?: string,
     anotherReaction?: boolean,
-    anotherSelected?: string
+    anotherSelected?: string,
+    anotherReactionAppearance?: NativeAnotherReaction
   ): void;
 
   updateTrigger(
@@ -70,7 +90,8 @@ export interface ReactionsHost extends HybridObject<{
     items: NativeReactionItem[],
     selectedId?: string,
     anotherReaction?: boolean,
-    anotherSelected?: string
+    anotherSelected?: string,
+    anotherReactionAppearance?: NativeAnotherReaction
   ): void;
 
   unregisterTrigger(triggerId: string): void;

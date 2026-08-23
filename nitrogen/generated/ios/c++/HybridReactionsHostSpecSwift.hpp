@@ -14,14 +14,17 @@ namespace GlassReactions { class HybridReactionsHostSpec_cxx; }
 
 // Forward declaration of `ReactionRenderMode` to properly resolve imports.
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
+// Forward declaration of `NativeAnotherReaction` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeAnotherReaction; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
 #include "ReactionRenderMode.hpp"
+#include "NativeAnotherReaction.hpp"
+#include <optional>
 #include <string>
 #include "NativeReactionItem.hpp"
 #include <vector>
-#include <optional>
 #include <functional>
 
 #include "GlassReactions-Swift-Cxx-Umbrella.hpp"
@@ -76,8 +79,8 @@ namespace margelo::nitro::glassreactions {
 
   public:
     // Methods
-    inline void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled) override {
-      auto __result = _swiftPart.activate(static_cast<int>(renderMode), std::forward<decltype(longPressDurationMs)>(longPressDurationMs), std::forward<decltype(anotherReactionEnabled)>(anotherReactionEnabled));
+    inline void activate(ReactionRenderMode renderMode, double longPressDurationMs, bool anotherReactionEnabled, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) override {
+      auto __result = _swiftPart.activate(static_cast<int>(renderMode), std::forward<decltype(longPressDurationMs)>(longPressDurationMs), std::forward<decltype(anotherReactionEnabled)>(anotherReactionEnabled), anotherReactionAppearance);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -88,14 +91,14 @@ namespace margelo::nitro::glassreactions {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override {
-      auto __result = _swiftPart.registerTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), items, selectedId, anotherReaction, anotherSelected);
+    inline void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) override {
+      auto __result = _swiftPart.registerTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), items, selectedId, anotherReaction, anotherSelected, anotherReactionAppearance);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected) override {
-      auto __result = _swiftPart.updateTrigger(triggerId, items, selectedId, anotherReaction, anotherSelected);
+    inline void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) override {
+      auto __result = _swiftPart.updateTrigger(triggerId, items, selectedId, anotherReaction, anotherSelected, anotherReactionAppearance);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

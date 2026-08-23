@@ -130,9 +130,9 @@ open class HybridReactionsHostSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func activate(renderMode: Int32, longPressDurationMs: Double, anotherReactionEnabled: Bool) -> bridge.Result_void_ {
+  public final func activate(renderMode: Int32, longPressDurationMs: Double, anotherReactionEnabled: Bool, anotherReactionAppearance: bridge.std__optional_NativeAnotherReaction_) -> bridge.Result_void_ {
     do {
-      try self.__implementation.activate(renderMode: margelo.nitro.glassreactions.ReactionRenderMode(rawValue: renderMode)!, longPressDurationMs: longPressDurationMs, anotherReactionEnabled: anotherReactionEnabled)
+      try self.__implementation.activate(renderMode: margelo.nitro.glassreactions.ReactionRenderMode(rawValue: renderMode)!, longPressDurationMs: longPressDurationMs, anotherReactionEnabled: anotherReactionEnabled, anotherReactionAppearance: anotherReactionAppearance.value)
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
@@ -152,7 +152,7 @@ open class HybridReactionsHostSpec_cxx {
   }
   
   @inline(__always)
-  public final func registerTrigger(triggerId: std.string, viewTag: Double, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_) -> bridge.Result_void_ {
+  public final func registerTrigger(triggerId: std.string, viewTag: Double, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_, anotherReactionAppearance: bridge.std__optional_NativeAnotherReaction_) -> bridge.Result_void_ {
     do {
       try self.__implementation.registerTrigger(triggerId: String(triggerId), viewTag: viewTag, items: items.map({ __item in __item }), selectedId: { () -> String? in
         if bridge.has_value_std__optional_std__string_(selectedId) {
@@ -175,7 +175,7 @@ open class HybridReactionsHostSpec_cxx {
         } else {
           return nil
         }
-      }())
+      }(), anotherReactionAppearance: anotherReactionAppearance.value)
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
@@ -184,7 +184,7 @@ open class HybridReactionsHostSpec_cxx {
   }
   
   @inline(__always)
-  public final func updateTrigger(triggerId: std.string, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_) -> bridge.Result_void_ {
+  public final func updateTrigger(triggerId: std.string, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_, anotherReactionAppearance: bridge.std__optional_NativeAnotherReaction_) -> bridge.Result_void_ {
     do {
       try self.__implementation.updateTrigger(triggerId: String(triggerId), items: items.map({ __item in __item }), selectedId: { () -> String? in
         if bridge.has_value_std__optional_std__string_(selectedId) {
@@ -207,7 +207,7 @@ open class HybridReactionsHostSpec_cxx {
         } else {
           return nil
         }
-      }())
+      }(), anotherReactionAppearance: anotherReactionAppearance.value)
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
