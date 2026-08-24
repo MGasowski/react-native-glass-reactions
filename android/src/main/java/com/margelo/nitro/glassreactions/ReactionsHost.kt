@@ -124,41 +124,30 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         }
     }
 
-    override fun registerTrigger(
+    override fun syncTrigger(
         triggerId: String,
         viewTag: Double,
-        items: Array<NativeReactionItem>,
-        selectedId: String?,
-        anotherReaction: Boolean?,
-        anotherSelected: String?,
-        anotherReactionAppearance: NativeAnotherReaction?
+        payload: NativeTriggerPayload
     ) {
         val tag = viewTag.toInt()
         main.post {
+            // A trigger's tag cannot change without a remount, which
+            // unregisters first — but the tag index is the only thing that
+            // would silently rot if it ever did, so the stale entry goes rather
+            // than being assumed absent.
+            registrations[triggerId]?.let {
+                if (it.viewTag != tag) triggerIdByTag.remove(it.viewTag)
+            }
+
             registrations[triggerId] = TriggerRegistration(
-                tag, items, selectedId, anotherReaction, anotherSelected,
-                anotherReactionAppearance
+                viewTag = tag,
+                items = payload.items,
+                selectedId = payload.selectedId,
+                anotherReaction = payload.anotherReaction,
+                anotherSelected = payload.anotherSelected,
+                anotherAppearance = payload.anotherReactionAppearance
             )
             triggerIdByTag[tag] = triggerId
-        }
-    }
-
-    override fun updateTrigger(
-        triggerId: String,
-        items: Array<NativeReactionItem>,
-        selectedId: String?,
-        anotherReaction: Boolean?,
-        anotherSelected: String?,
-        anotherReactionAppearance: NativeAnotherReaction?
-    ) {
-        main.post {
-            registrations[triggerId]?.let {
-                it.items = items
-                it.selectedId = selectedId
-                it.anotherReaction = anotherReaction
-                it.anotherSelected = anotherSelected
-                it.anotherAppearance = anotherReactionAppearance
-            }
         }
     }
 

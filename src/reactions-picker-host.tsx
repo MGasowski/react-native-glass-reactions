@@ -1,68 +1,8 @@
 import { useEffect, useRef } from 'react';
-import {
-  anotherReactionKey,
-  toNativeAnotherReaction,
-} from './another-reaction';
+import { anotherReactionKey, toNativeAnotherReaction } from './payload';
 import { host } from './host';
-import type {
-  AnotherReactionAppearance,
-  ReactionId,
-  ReactionRenderMode,
-} from './types';
-
-/**
- * Callbacks are held in a module-level registry keyed by trigger id rather than
- * being sent across the bridge per trigger. Registration must never cause a
- * render — a `useState` here would turn every list-cell recycle into a render
- * of the whole tree (spec §6.5).
- */
-type SelectListener = (reactionId: ReactionId | null) => void;
-
-const listeners = new Map<
-  string,
-  {
-    onSelect: SelectListener;
-    onSelectAnother?: (emoji: string) => void;
-    onOpen?: () => void;
-    onClose?: () => void;
-  }
->();
-
-export function addTriggerListener(
-  triggerId: string,
-  entry: {
-    onSelect: SelectListener;
-    onSelectAnother?: (emoji: string) => void;
-    onOpen?: () => void;
-    onClose?: () => void;
-  }
-): void {
-  listeners.set(triggerId, entry);
-}
-
-export function removeTriggerListener(triggerId: string): void {
-  listeners.delete(triggerId);
-}
-
-let wired = false;
-
-function wireCallbacksOnce(): void {
-  if (wired) return;
-  wired = true;
-
-  host.setOnSelect((triggerId, reactionId) => {
-    listeners.get(triggerId)?.onSelect(reactionId ?? null);
-  });
-  host.setOnSelectAnother((triggerId, emoji) => {
-    listeners.get(triggerId)?.onSelectAnother?.(emoji);
-  });
-  host.setOnOpen((triggerId) => {
-    listeners.get(triggerId)?.onOpen?.();
-  });
-  host.setOnClose((triggerId) => {
-    listeners.get(triggerId)?.onClose?.();
-  });
-}
+import { wireCallbacksOnce } from './trigger-registration';
+import type { AnotherReactionAppearance, ReactionRenderMode } from './types';
 
 export interface ReactionsPickerHostProps {
   /** Default `auto`. Set to `emoji` to disable symbol rendering everywhere. */

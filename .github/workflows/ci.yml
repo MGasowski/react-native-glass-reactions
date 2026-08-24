@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck files
         run: yarn typecheck
 
+      - name: Test files
+        run: yarn test
+
 
   # The interaction policy compiles and tests on its own — no CocoaPods, no
   # Xcode project, no simulator — so it runs as its own job in seconds rather

@@ -17,8 +17,7 @@ namespace margelo::nitro::glassreactions {
       prototype.registerHybridGetter("isLiquidGlassSupported", &HybridReactionsHostSpec::getIsLiquidGlassSupported);
       prototype.registerHybridMethod("activate", &HybridReactionsHostSpec::activate);
       prototype.registerHybridMethod("deactivate", &HybridReactionsHostSpec::deactivate);
-      prototype.registerHybridMethod("registerTrigger", &HybridReactionsHostSpec::registerTrigger);
-      prototype.registerHybridMethod("updateTrigger", &HybridReactionsHostSpec::updateTrigger);
+      prototype.registerHybridMethod("syncTrigger", &HybridReactionsHostSpec::syncTrigger);
       prototype.registerHybridMethod("unregisterTrigger", &HybridReactionsHostSpec::unregisterTrigger);
       prototype.registerHybridMethod("setOnSelect", &HybridReactionsHostSpec::setOnSelect);
       prototype.registerHybridMethod("setOnSelectAnother", &HybridReactionsHostSpec::setOnSelectAnother);

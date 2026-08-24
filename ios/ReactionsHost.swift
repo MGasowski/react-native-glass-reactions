@@ -110,43 +110,31 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     }
   }
 
-  func registerTrigger(
+  func syncTrigger(
     triggerId: String,
     viewTag: Double,
-    items: [NativeReactionItem],
-    selectedId: String?,
-    anotherReaction: Bool?,
-    anotherSelected: String?,
-    anotherReactionAppearance: NativeAnotherReaction?
+    payload: NativeTriggerPayload
   ) throws {
     let tag = Int(viewTag)
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
+
+      // A trigger's tag cannot change without a remount, which unregisters
+      // first — but the tag index is the only thing that would silently rot if
+      // it ever did, so the stale entry goes rather than being assumed absent.
+      if let existing = self.registrations[triggerId], existing.viewTag != tag {
+        self.triggerIdByTag.removeValue(forKey: existing.viewTag)
+      }
+
       self.registrations[triggerId] = TriggerRegistration(
-        viewTag: tag, items: items, selectedId: selectedId,
-        anotherReaction: anotherReaction, anotherSelected: anotherSelected,
-        anotherAppearance: anotherReactionAppearance
+        viewTag: tag,
+        items: payload.items,
+        selectedId: payload.selectedId,
+        anotherReaction: payload.anotherReaction,
+        anotherSelected: payload.anotherSelected,
+        anotherAppearance: payload.anotherReactionAppearance
       )
       self.triggerIdByTag[tag] = triggerId
-    }
-  }
-
-  func updateTrigger(
-    triggerId: String,
-    items: [NativeReactionItem],
-    selectedId: String?,
-    anotherReaction: Bool?,
-    anotherSelected: String?,
-    anotherReactionAppearance: NativeAnotherReaction?
-  ) throws {
-    DispatchQueue.main.async { [weak self] in
-      guard let self, var existing = self.registrations[triggerId] else { return }
-      existing.items = items
-      existing.selectedId = selectedId
-      existing.anotherReaction = anotherReaction
-      existing.anotherSelected = anotherSelected
-      existing.anotherAppearance = anotherReactionAppearance
-      self.registrations[triggerId] = existing
     }
   }
 

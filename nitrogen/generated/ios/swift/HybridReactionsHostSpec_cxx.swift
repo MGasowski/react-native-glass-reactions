@@ -152,62 +152,9 @@ open class HybridReactionsHostSpec_cxx {
   }
   
   @inline(__always)
-  public final func registerTrigger(triggerId: std.string, viewTag: Double, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_, anotherReactionAppearance: bridge.std__optional_NativeAnotherReaction_) -> bridge.Result_void_ {
+  public final func syncTrigger(triggerId: std.string, viewTag: Double, payload: NativeTriggerPayload) -> bridge.Result_void_ {
     do {
-      try self.__implementation.registerTrigger(triggerId: String(triggerId), viewTag: viewTag, items: items.map({ __item in __item }), selectedId: { () -> String? in
-        if bridge.has_value_std__optional_std__string_(selectedId) {
-          let __unwrapped = bridge.get_std__optional_std__string_(selectedId)
-          return String(__unwrapped)
-        } else {
-          return nil
-        }
-      }(), anotherReaction: { () -> Bool? in
-        if bridge.has_value_std__optional_bool_(anotherReaction) {
-          let __unwrapped = bridge.get_std__optional_bool_(anotherReaction)
-          return __unwrapped
-        } else {
-          return nil
-        }
-      }(), anotherSelected: { () -> String? in
-        if bridge.has_value_std__optional_std__string_(anotherSelected) {
-          let __unwrapped = bridge.get_std__optional_std__string_(anotherSelected)
-          return String(__unwrapped)
-        } else {
-          return nil
-        }
-      }(), anotherReactionAppearance: anotherReactionAppearance.value)
-      return bridge.create_Result_void_()
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func updateTrigger(triggerId: std.string, items: bridge.std__vector_NativeReactionItem_, selectedId: bridge.std__optional_std__string_, anotherReaction: bridge.std__optional_bool_, anotherSelected: bridge.std__optional_std__string_, anotherReactionAppearance: bridge.std__optional_NativeAnotherReaction_) -> bridge.Result_void_ {
-    do {
-      try self.__implementation.updateTrigger(triggerId: String(triggerId), items: items.map({ __item in __item }), selectedId: { () -> String? in
-        if bridge.has_value_std__optional_std__string_(selectedId) {
-          let __unwrapped = bridge.get_std__optional_std__string_(selectedId)
-          return String(__unwrapped)
-        } else {
-          return nil
-        }
-      }(), anotherReaction: { () -> Bool? in
-        if bridge.has_value_std__optional_bool_(anotherReaction) {
-          let __unwrapped = bridge.get_std__optional_bool_(anotherReaction)
-          return __unwrapped
-        } else {
-          return nil
-        }
-      }(), anotherSelected: { () -> String? in
-        if bridge.has_value_std__optional_std__string_(anotherSelected) {
-          let __unwrapped = bridge.get_std__optional_std__string_(anotherSelected)
-          return String(__unwrapped)
-        } else {
-          return nil
-        }
-      }(), anotherReactionAppearance: anotherReactionAppearance.value)
+      try self.__implementation.syncTrigger(triggerId: String(triggerId), viewTag: viewTag, payload: payload)
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()

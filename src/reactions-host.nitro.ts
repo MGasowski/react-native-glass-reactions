@@ -47,6 +47,25 @@ export interface NativeAnotherReaction {
 }
 
 /**
+ * Everything a trigger tells the host about itself, other than its identity and
+ * its view tag.
+ *
+ * A struct rather than five more positional parameters, for the same reason
+ * `NativeAnotherReaction` is one: the next optional field becomes a member here
+ * instead of an eighth argument on a method that exists on two platforms.
+ */
+export interface NativeTriggerPayload {
+  items: NativeReactionItem[];
+  selectedId?: string;
+  /** `undefined` inherits the host-wide setting. */
+  anotherReaction?: boolean;
+  /** The custom emoji previously picked through "another reaction". */
+  anotherSelected?: string;
+  /** Replaces the host-wide appearance outright rather than merging into it. */
+  anotherReactionAppearance?: NativeAnotherReaction;
+}
+
+/**
  * Process-wide host singleton. This is what makes the single-picker guarantee
  * structural rather than a matter of consumer discipline (spec §4.3): the
  * instance lives here, not in the React tree, so no arrangement of components
@@ -75,23 +94,16 @@ export interface ReactionsHost extends HybridObject<{
   /** Tears down the recognizer and releases the pooled picker. */
   deactivate(): void;
 
-  registerTrigger(
+  /**
+   * Upserts a trigger: registers it if it is new, replaces its payload if it is
+   * not. One method rather than a register/update pair, because the two differed
+   * only in create-versus-mutate, and every caller had to know which of the
+   * two it was in.
+   */
+  syncTrigger(
     triggerId: string,
     viewTag: number,
-    items: NativeReactionItem[],
-    selectedId?: string,
-    anotherReaction?: boolean,
-    anotherSelected?: string,
-    anotherReactionAppearance?: NativeAnotherReaction
-  ): void;
-
-  updateTrigger(
-    triggerId: string,
-    items: NativeReactionItem[],
-    selectedId?: string,
-    anotherReaction?: boolean,
-    anotherSelected?: string,
-    anotherReactionAppearance?: NativeAnotherReaction
+    payload: NativeTriggerPayload
   ): void;
 
   unregisterTrigger(triggerId: string): void;
