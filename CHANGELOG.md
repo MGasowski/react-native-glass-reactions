@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/MGasowski/react-native-glass-reactions/compare/v0.1.1...v0.2.0) (2026-08-24)
+
+### Features
+
+* configurable "another reaction" appearance ([#4](https://github.com/MGasowski/react-native-glass-reactions/issues/4)) ([62783e1](https://github.com/MGasowski/react-native-glass-reactions/commit/62783e1d5263d2b4287bd264528687e5e90f40e2))
+
+### Notes
+
+* the reaction the picker treats as "currently selected" is now fixed to what was shown when the long-press began, rather than being re-read live if it changes mid-press — picking the shown selection now reliably clears it, even if the underlying state changed while the picker was open ([#5](https://github.com/MGasowski/react-native-glass-reactions/issues/5))
+* **android:** the picker now sits 8dp above its trigger instead of 12dp, matching iOS ([#9](https://github.com/MGasowski/react-native-glass-reactions/issues/9))
+
 ## [0.1.1](https://github.com/MGasowski/react-native-glass-reactions/compare/v0.1.0...v0.1.1) (2026-08-20)
 
 ### Features
