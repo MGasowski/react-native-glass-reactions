@@ -66,6 +66,59 @@ private object Metrics {
     const val SELECTION_POP_SCALE = 1.9f
 }
 
+/**
+ * Whether the surface behind a view is dark.
+ *
+ * The picker sits above arbitrary app content, so the system theme says
+ * nothing about what is actually behind it — the pixels decide instead:
+ * walking view background colours is defeated by React Native's view
+ * flattening (the painted colour often lives on no ancestor at all), so the
+ * trigger's on-screen region is software-drawn squashed into a handful of
+ * pixels and averaged. One tiny render per open, at gesture-begin — never on
+ * the scroll or focus path.
+ *
+ * Named and placed to mirror `SurfaceAppearance` in `ios/ReactionsPillView.swift`
+ * — the pill's file is where both platforms define it, even though the host is
+ * what calls it. `decor` is passed in explicitly rather than resolved here: a
+ * `View` has no path to its owning `Window` without an `Activity` reference,
+ * which is the host's to look up, not this object's.
+ */
+internal object SurfaceAppearance {
+    fun isDark(view: View, decor: View?): Boolean {
+        val nightFallback = (view.resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        return try {
+            if (decor == null) return nightFallback
+            val width = view.width
+            val height = view.height
+            if (width < 1 || height < 1) return nightFallback
+
+            val location = IntArray(2)
+            view.getLocationInWindow(location)
+
+            val sample = 4
+            val bitmap = Bitmap.createBitmap(sample, sample, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.scale(sample.toFloat() / width, sample.toFloat() / height)
+            canvas.translate(-location[0].toFloat(), -location[1].toFloat())
+            decor.draw(canvas)
+
+            var total = 0.0
+            for (y in 0 until sample) {
+                for (x in 0 until sample) {
+                    val pixel = bitmap.getPixel(x, y)
+                    total += (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) /
+                        (3.0 * 255.0)
+                }
+            }
+            bitmap.recycle()
+            total / (sample * sample) < 0.5
+        } catch (_: Throwable) {
+            nightFallback
+        }
+    }
+}
+
 /** A reaction resolved to what actually gets drawn. */
 internal data class Renderable(
     val id: String,
@@ -239,73 +292,24 @@ internal class ReactionsPillView(context: android.content.Context) :
      * Renderables are *derived from* the interaction's slots rather than built
      * alongside them, which is what makes it impossible for the drawn row and
      * the hit-tested row to disagree about what sits at a given index.
+     *
+     * Resolving each slot is [ReactionResolver]'s job, not the pill's — the
+     * pill only supplies what the resolver cannot know for itself: the pixel
+     * side length reactions rasterise at, and the tint colour the "another
+     * reaction" chrome bakes in for the current appearance.
      */
     fun apply(slots: List<Slot>, selectedId: String?, renderMode: ReactionRenderMode) {
-        apply(slots.map { renderable(it, renderMode) }, selectedId, slots.separatorAfter)
-    }
-
-    /**
-     * The *order* to try is [ReactionResolution]'s call — pure, and mirrored
-     * from `ios/ReactionResolution.swift`. This function's only job is to walk
-     * that order and draw the first candidate that actually rasterises.
-     * Android renders emoji only in 1.0 (`symbolsSupported = false`), so in
-     * practice the order never offers a symbol and this always draws an emoji
-     * or the built-in glyph — but the walk itself does not know that, which is
-     * what lets Android gain symbol support later by flipping one flag rather
-     * than rewriting this function.
-     */
-    private fun renderable(slot: Slot, renderMode: ReactionRenderMode): Renderable {
-        val mode = if (renderMode == ReactionRenderMode.AUTO) RenderMode.Auto else RenderMode.Emoji
-        val order = ReactionResolution.resolutionOrder(slot, mode, symbolsSupported = false)
-
-        for (candidate in order) {
-            val image = image(candidate) ?: continue
-            return Renderable(id(slot), image, label(slot))
+        val side = (itemSize * Metrics.MAX_FOCUS_SCALE).toInt().coerceAtLeast(1)
+        val tintColor = if (isDarkAppearance) {
+            Color.WHITE
+        } else {
+            Color.argb(0xFF, 0x1C, 0x1C, 0x1E)
         }
-
-        // Unreached in practice: the chain always ends in Emoji or BuiltIn, and
-        // NativeReactionItem.emoji is required, so only an empty custom pick
-        // could get here.
-        return Renderable(id(slot), null, label(slot))
-    }
-
-    private fun image(candidate: Candidate): Bitmap? = when (candidate) {
-        // Android has no symbol rasteriser in 1.0 — these are unreachable
-        // while resolutionOrder is called with symbolsSupported = false, kept
-        // exhaustive rather than throwing so a future symbol-supporting build
-        // degrades gracefully to emoji instead of crashing.
-        is Candidate.Symbol -> null
-        is Candidate.AnotherSymbol -> null
-        is Candidate.Emoji -> rasteriseEmoji(candidate.value)
-        is Candidate.BuiltIn -> rasteriseAnotherReaction(candidate.badge)
-    }
-
-    private fun id(slot: Slot): String = when (slot) {
-        is Slot.Reaction -> slot.reaction.id
-        // The custom pick's id is the emoji itself — it exists in no item
-        // list, so the emoji is the only stable identity it has.
-        is Slot.Custom -> slot.emoji
-        is Slot.Another -> ANOTHER_REACTION_ID
-    }
-
-    private fun label(slot: Slot): String = when (slot) {
-        is Slot.Reaction -> slot.reaction.accessibilityLabel
-        is Slot.Custom -> slot.emoji
-        is Slot.Another -> slot.appearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
-    }
-
-    companion object {
-        /**
-         * Synthetic id carried by the trailing "another reaction" plus item.
-         * Never reported through onSelect — releasing on it opens the picker.
-         */
-        const val ANOTHER_REACTION_ID = "__another_reaction__"
-
-        /**
-         * Default label for the "another reaction" item. English-only, which is
-         * why `accessibilityLabel` is overridable.
-         */
-        const val ANOTHER_REACTION_LABEL = "Add another reaction"
+        apply(
+            slots.map { ReactionResolver.renderable(it, renderMode, side, tintColor) },
+            selectedId,
+            slots.separatorAfter
+        )
     }
 
     /**
@@ -644,11 +648,27 @@ internal class ReactionsPillView(context: android.content.Context) :
         )
     }
 
+}
+
+/**
+ * Draws the bitmaps a `Renderable` carries.
+ *
+ * Named and placed to mirror `ReactionRasteriser` in
+ * `ios/ReactionsPillView.swift`. The two platforms genuinely differ here, not
+ * just in name: iOS rasterises "another reaction" chrome as a template image
+ * and leaves tinting to `UIImageView.tintColor` at display time, so its
+ * rasteriser needs no colour at all. A plain Android `Bitmap` has no
+ * equivalent — colour has to be baked in when the pixels are drawn — so `side`
+ * and `color` are explicit parameters here where iOS's equivalents read from
+ * `Metrics` and a template render mode instead. That is a real platform
+ * difference, not a gap to close.
+ */
+private object ReactionRasteriser {
+
     /** Emoji are drawn once into a bitmap and reused (spec §6.5). */
-    fun rasteriseEmoji(value: String): Bitmap? {
+    fun emoji(value: String, side: Int): Bitmap? {
         if (value.isEmpty()) return null
 
-        val side = (itemSize * Metrics.MAX_FOCUS_SCALE).toInt().coerceAtLeast(1)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = side * 0.82f
             textAlign = Paint.Align.CENTER
@@ -668,14 +688,8 @@ internal class ReactionsPillView(context: android.content.Context) :
      * taken from a font so weight, colour, and the knockout plus match the iOS
      * glyph.
      */
-    private fun rasteriseAnotherReaction(badge: Boolean = true): Bitmap {
-        val side = (itemSize * Metrics.MAX_FOCUS_SCALE).toInt().coerceAtLeast(1)
+    fun anotherReaction(side: Int, color: Int, badge: Boolean = true): Bitmap {
         val s = side.toFloat()
-        val color = if (isDarkAppearance) {
-            Color.WHITE
-        } else {
-            Color.argb(0xFF, 0x1C, 0x1C, 0x1E)
-        }
 
         val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -761,5 +775,84 @@ internal class ReactionsPillView(context: android.content.Context) :
         canvas.drawLine(cx - arm, cy, cx + arm, cy, plus)
         canvas.drawLine(cx, cy - arm, cx, cy + arm, plus)
         return bitmap
+    }
+}
+
+/**
+ * Turns a slot into a drawable, applying the fallback chain from
+ * [ReactionResolution] — the pure decision — by walking it and drawing the
+ * first candidate that actually rasterises. Named and placed to mirror
+ * `ReactionResolver` in `ios/ReactionsPillView.swift`.
+ *
+ * On iOS this is called from the host, which resolves before handing the pill
+ * a plain renderable list. On Android it is called from the pill's own
+ * `apply`, which resolves internally — a call-site difference already present
+ * before this refactor, kept as is: relocating *which side calls the
+ * resolver* is a bigger, riskier change than naming the resolver itself, and
+ * changes no observable behaviour either way.
+ */
+private object ReactionResolver {
+    /**
+     * Synthetic id carried by the trailing "another reaction" plus item.
+     * Never reported through onSelect — releasing on it opens the picker.
+     */
+    const val ANOTHER_REACTION_ID = "__another_reaction__"
+
+    /**
+     * Default label for the "another reaction" item. English-only, which is
+     * why `accessibilityLabel` is overridable.
+     */
+    const val ANOTHER_REACTION_LABEL = "Add another reaction"
+
+    /**
+     * Android renders emoji only in 1.0 (`symbolsSupported = false`), so in
+     * practice the order never offers a symbol and this always draws an emoji
+     * or the built-in glyph — but the walk itself does not know that, which is
+     * what lets Android gain symbol support later by flipping one flag rather
+     * than rewriting this function.
+     */
+    fun renderable(
+        slot: Slot,
+        renderMode: ReactionRenderMode,
+        side: Int,
+        tintColor: Int
+    ): Renderable {
+        val mode = if (renderMode == ReactionRenderMode.AUTO) RenderMode.Auto else RenderMode.Emoji
+        val order = ReactionResolution.resolutionOrder(slot, mode, symbolsSupported = false)
+
+        for (candidate in order) {
+            val image = image(candidate, side, tintColor) ?: continue
+            return Renderable(id(slot), image, label(slot))
+        }
+
+        // Unreached in practice: the chain always ends in Emoji or BuiltIn, and
+        // NativeReactionItem.emoji is required, so only an empty custom pick
+        // could get here.
+        return Renderable(id(slot), null, label(slot))
+    }
+
+    private fun image(candidate: Candidate, side: Int, tintColor: Int): Bitmap? = when (candidate) {
+        // Android has no symbol rasteriser in 1.0 — these are unreachable
+        // while resolutionOrder is called with symbolsSupported = false, kept
+        // exhaustive rather than throwing so a future symbol-supporting build
+        // degrades gracefully to emoji instead of crashing.
+        is Candidate.Symbol -> null
+        is Candidate.AnotherSymbol -> null
+        is Candidate.Emoji -> ReactionRasteriser.emoji(candidate.value, side)
+        is Candidate.BuiltIn -> ReactionRasteriser.anotherReaction(side, tintColor, candidate.badge)
+    }
+
+    private fun id(slot: Slot): String = when (slot) {
+        is Slot.Reaction -> slot.reaction.id
+        // The custom pick's id is the emoji itself — it exists in no item
+        // list, so the emoji is the only stable identity it has.
+        is Slot.Custom -> slot.emoji
+        is Slot.Another -> ANOTHER_REACTION_ID
+    }
+
+    private fun label(slot: Slot): String = when (slot) {
+        is Slot.Reaction -> slot.reaction.accessibilityLabel
+        is Slot.Custom -> slot.emoji
+        is Slot.Another -> slot.appearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
     }
 }

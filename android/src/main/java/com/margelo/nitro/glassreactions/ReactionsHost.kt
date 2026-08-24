@@ -1,7 +1,6 @@
 package com.margelo.nitro.glassreactions
 
 import android.app.Activity
-import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
@@ -297,51 +296,6 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         return null
     }
 
-    /**
-     * Whether the surface behind the trigger is dark. The pixels decide:
-     * walking view background colours is defeated by React Native's view
-     * flattening (the painted colour often lives on no ancestor at all), so
-     * the trigger's on-screen region is software-drawn squashed into a
-     * handful of pixels and averaged. One tiny render per open, at
-     * gesture-begin — never on the scroll or focus path.
-     */
-    private fun isDarkSurface(view: View): Boolean {
-        val nightFallback = (view.resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        return try {
-            val decor = currentActivity()?.window?.decorView ?: return nightFallback
-            val width = view.width
-            val height = view.height
-            if (width < 1 || height < 1) return nightFallback
-
-            val location = IntArray(2)
-            view.getLocationInWindow(location)
-
-            val sample = 4
-            val bitmap = android.graphics.Bitmap.createBitmap(
-                sample, sample, android.graphics.Bitmap.Config.ARGB_8888
-            )
-            val canvas = android.graphics.Canvas(bitmap)
-            canvas.scale(sample.toFloat() / width, sample.toFloat() / height)
-            canvas.translate(-location[0].toFloat(), -location[1].toFloat())
-            decor.draw(canvas)
-
-            var total = 0.0
-            for (y in 0 until sample) {
-                for (x in 0 until sample) {
-                    val pixel = bitmap.getPixel(x, y)
-                    total += (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) /
-                        (3.0 * 255.0)
-                }
-            }
-            bitmap.recycle()
-            total / (sample * sample) < 0.5
-        } catch (_: Throwable) {
-            nightFallback
-        }
-    }
-
     private fun containsPoint(view: View, x: Int, y: Int): Boolean {
         val location = IntArray(2)
         view.getLocationOnScreen(location)
@@ -365,7 +319,9 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
         // The pill matches the surface it floats over, not the system theme.
         // Set before apply: the dashed-emoji glyph rasterises in this appearance.
-        pill.setSurfaceAppearance(isDarkSurface(triggerView))
+        pill.setSurfaceAppearance(
+            SurfaceAppearance.isDark(triggerView, currentActivity()?.window?.decorView)
+        )
         // Drawn from the very list that will be hit-tested, in the same order,
         // so the row on screen and the row the rules reason about cannot
         // disagree.
