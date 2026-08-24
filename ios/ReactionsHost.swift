@@ -65,14 +65,11 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
   // MARK: Active interaction
 
-  private var activeTriggerId: String?
-  private var activeItems: [NativeReactionItem] = []
-  /// Whether the current interaction shows the trailing plus item. The plus
-  /// occupies a slot after `activeItems`, so hit-testing counts it while
-  /// selection reporting does not.
-  private var activeShowsPlus = false
-  private var activePickerFrame: CGRect = .zero
-  private var focusedIndex: Int?
+  /// The rules of the press currently in flight, or nil when none is. Every
+  /// question about focus and release goes here; the host only reacts to the
+  /// answers. Nil is the whole of "no interaction" — there is no separate
+  /// focused index that can outlive it.
+  private var interaction: PickerInteraction?
   private var disabledScrollView: UIScrollView?
   private var haptics: UIImpactFeedbackGenerator?
 
@@ -106,7 +103,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       self.recognizer = nil
       self.recognizerDelegate = nil
       self.emojiInput.dismiss()
-      self.dismiss(selected: nil, cancelled: true)
+      self.cancelInteraction()
       self.pickerView = nil
       self.overlayWindow?.isHidden = true
       self.overlayWindow = nil
@@ -161,8 +158,8 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       }
       // A row recycling or scrolling away mid-interaction dismisses without
       // selection rather than leaving a picker anchored to nothing (spec §4.3).
-      if self.activeTriggerId == triggerId {
-        self.dismiss(selected: nil, cancelled: true)
+      if self.interaction?.triggerId == triggerId {
+        self.cancelInteraction()
       }
     }
   }
@@ -283,7 +280,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     case .ended:
       end()
     case .cancelled, .failed:
-      dismiss(selected: nil, cancelled: true)
+      cancelInteraction()
     default:
       break
     }
@@ -298,19 +295,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       let overlay = ensureOverlayWindow()
     else { return }
 
-    activeTriggerId = triggerId
-    activeShowsPlus = registration.anotherReaction ?? anotherReactionEnabled
-
-    // The custom pick rides with the plus: both belong to the "another
-    // reaction" section, so disabling the feature hides both.
-    var selectable = registration.items
-    if activeShowsPlus, let emoji = registration.anotherSelected, !emoji.isEmpty {
-      selectable.append(NativeReactionItem(
-        id: emoji, emoji: emoji, symbolIos: nil, symbolAndroid: nil,
-        accessibilityLabel: emoji
-      ))
-    }
-    activeItems = selectable
+    let slots = slots(for: registration)
 
     // Ownership of the touch is now unambiguous: cancel the enclosing scroll
     // view's pan so opening the picker never scrolls the list (spec §6.4).
@@ -324,27 +309,14 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     picker.overrideUserInterfaceStyle =
       SurfaceAppearance.isDark(under: triggerView) ? .dark : .light
 
-    var renderables = ReactionResolver.resolve(
-      registration.items, renderMode: renderMode
-    )
-    if activeShowsPlus {
-      if let emoji = registration.anotherSelected, !emoji.isEmpty {
-        renderables.append(ReactionResolver.customRenderable(emoji: emoji))
-      }
-      renderables.append(ReactionResolver.anotherReactionRenderable(
-        appearance: registration.anotherAppearance ?? anotherReactionAppearance,
-        renderMode: renderMode
-      ))
-    }
-    // Divider between the consumer's reactions and the "another reaction"
-    // section, drawn only when both sides exist.
-    let separatorAfter: Int? =
-      activeShowsPlus && !registration.items.isEmpty
-        ? registration.items.count : nil
+    // Drawn from the very list that will be hit-tested, in the same order, so
+    // the row on screen and the row the rules reason about cannot disagree.
     picker.apply(
-      items: renderables,
+      items: slots.map {
+        ReactionResolver.renderable(for: $0, renderMode: renderMode)
+      },
       selectedId: registration.selectedId,
-      separatorAfter: separatorAfter
+      separatorAfter: slots.separatorAfter
     )
 
     // Frame resolved from the live view, not from anything JS measured.
@@ -360,8 +332,8 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       max(Layout.screenMargin, bounds.width - size.width - Layout.screenMargin)
     )
     origin.y = max(Layout.screenMargin, origin.y)
+    let pickerFrame = CGRect(origin: origin, size: size)
 
-    activePickerFrame = CGRect(origin: origin, size: size)
     // Geometry via bounds and center, never `frame`: prepareForPresentation
     // applies the collapsed scale transform, and assigning `frame` to a
     // transformed view divides the size by the scale — which is exactly the
@@ -370,9 +342,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // anchor prepareForPresentation sets.
     picker.prepareForPresentation()
     picker.bounds = CGRect(origin: .zero, size: size)
-    picker.center = CGPoint(
-      x: activePickerFrame.midX, y: activePickerFrame.maxY
-    )
+    picker.center = CGPoint(x: pickerFrame.midX, y: pickerFrame.maxY)
     // Attached once and then only hidden/unhidden: re-attaching a glass
     // effect view replays UIKit's frosted "materialize" animation, which is
     // the grey flash on open. A hidden layer is not composited, so the
@@ -388,92 +358,131 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // has first-fire latency that breaks frame alignment (spec §6.5).
     haptics?.prepare()
 
+    // Everything the rules need, frozen at this instant — `selectedId`
+    // included. The user is choosing against the pill just drawn, so that is
+    // what the deselect comparison has to be made against; re-reading the
+    // registry at release time would compare against something never shown.
+    interaction = PickerInteraction(
+      triggerId: triggerId,
+      slots: slots,
+      selectedId: registration.selectedId,
+      pickerFrame: pickerFrame,
+      tolerance: Layout.focusTolerance,
+      geometry: picker
+    )
+
     // Deliberately no initial focus: at this instant the finger is on the row
     // that was pressed, not on a reaction. Focusing here is what made a
     // reaction appear pre-selected the moment the picker opened.
-    focusedIndex = nil
-    pickerView?.setFocusedIndex(nil)
+    picker.setFocusedIndex(nil)
 
     onOpen?(triggerId)
   }
 
-  private func index(at point: CGPoint) -> Int? {
-    // Just enough tolerance to stop the selection flickering at the edge, not
-    // enough to keep selecting from well outside the picker. The press that
-    // opens the picker lands on the row below it, so generous slack here means
-    // a reaction is selected before the finger has gone anywhere near one.
-    let hitArea = activePickerFrame.insetBy(dx: 0, dy: -Layout.focusTolerance)
-    guard hitArea.contains(point) else { return nil }
+  // MARK: Mapping
 
-    // The pill owns the slot geometry: slots are not uniform once the section
-    // separator inserts its extra width, so a plain stride would drift.
-    return pickerView?.slotIndex(atLocalX: point.x - activePickerFrame.minX)
+  /// The registration flattened into the one list the interaction reasons over.
+  private func slots(for registration: TriggerRegistration) -> [Slot] {
+    var slots = registration.items.map { item in
+      Slot.reaction(
+        Reaction(
+          id: item.id,
+          emoji: item.emoji,
+          symbolIos: item.symbolIos,
+          symbolAndroid: item.symbolAndroid,
+          accessibilityLabel: item.accessibilityLabel
+        )
+      )
+    }
+
+    guard registration.anotherReaction ?? anotherReactionEnabled else {
+      return slots
+    }
+    // The custom pick rides with the plus: both belong to the "another
+    // reaction" section, so disabling the feature hides both.
+    if let emoji = registration.anotherSelected, !emoji.isEmpty {
+      slots.append(.custom(emoji))
+    }
+    slots.append(
+      .another(appearance(registration.anotherAppearance ?? anotherReactionAppearance))
+    )
+    return slots
   }
 
+  /// Maps the Nitro transport struct onto the interaction's own type. The
+  /// generated, C++-backed struct stops here and goes no further in.
+  private func appearance(
+    _ native: NativeAnotherReaction?
+  ) -> AnotherReactionAppearance? {
+    guard let native else { return nil }
+    return AnotherReactionAppearance(
+      symbolIos: native.symbolIos,
+      symbolAndroid: native.symbolAndroid,
+      emoji: native.emoji,
+      badge: native.badge,
+      accessibilityLabel: native.accessibilityLabel
+    )
+  }
+
+  // MARK: Focus and release
+
   private func updateFocus(at point: CGPoint) {
-    guard activeTriggerId != nil else { return }
-    let next = index(at: point)
-    guard next != focusedIndex else { return }
-    focusedIndex = next
-    pickerView?.setFocusedIndex(next)
-    if next != nil {
+    guard let change = interaction?.focus(at: point) else { return }
+    switch change {
+    case .unchanged:
+      break
+    case .moved(let index):
+      pickerView?.setFocusedIndex(index)
       // Fired from the same code path that detects the change, so the haptic
       // and the visual land together (spec §4.4).
       haptics?.impactOccurred()
       haptics?.prepare()
+    case .cleared:
+      pickerView?.setFocusedIndex(nil)
     }
   }
 
   private func end() {
-    guard let triggerId = activeTriggerId else { return }
-    let registration = registrations[triggerId]
-
-    // Releasing on the plus is not a selection: the celebration plays, but the
-    // interaction hands over to the system emoji keyboard instead of reporting
-    // through onSelect.
-    if activeShowsPlus, focusedIndex == activeItems.count {
-      dismiss(selected: nil, cancelled: false, reportSelection: false)
-      emojiInput.present(over: keyWindow()) { [weak self] emoji in
-        self?.onSelectAnother?(triggerId, emoji)
-      }
-      return
-    }
-
-    var selection: String?
-    if let index = focusedIndex, index < activeItems.count {
-      let candidate = activeItems[index].id
-      // Upsert with deselect: picking the current selection clears it
-      // (spec §5).
-      selection = candidate == registration?.selectedId ? nil : candidate
-    }
-
-    let hadFocus = focusedIndex != nil
-    dismiss(selected: hadFocus ? selection : nil, cancelled: !hadFocus)
-  }
-
-  private func dismiss(
-    selected: String?, cancelled: Bool, reportSelection: Bool = true
-  ) {
-    guard let triggerId = activeTriggerId else { return }
+    guard let interaction else { return }
+    let triggerId = interaction.triggerId
+    let outcome = interaction.release()
 
     // Selection is reported at touch-up; teardown waits for the animation
     // (spec §4.3).
-    if !cancelled && reportSelection {
-      onSelect?(triggerId, selected)
+    switch outcome {
+    case .select(let reactionId, _):
+      onSelect?(triggerId, reactionId)
+    case .deselect:
+      onSelect?(triggerId, nil)
+    case .another, .cancel:
+      // Releasing on the plus is not a selection: the celebration still plays,
+      // but the interaction hands over to the system emoji keyboard below.
+      break
     }
 
-    // The celebration plays on whatever was under the finger, whether that
-    // committed a new selection or cleared the existing one — either way the
-    // user chose that reaction.
-    let celebratedIndex = cancelled ? nil : focusedIndex
+    finish(celebratingAt: outcome.celebratedIndex)
+
+    if case .another = outcome {
+      emojiInput.present(over: keyWindow()) { [weak self] emoji in
+        self?.onSelectAnother?(triggerId, emoji)
+      }
+    }
+  }
+
+  /// A press that never released: the gesture was cancelled, the row was
+  /// recycled out from under it, or the host was deactivated. There is no
+  /// outcome because there was no release — the interaction is simply dropped.
+  private func cancelInteraction() {
+    guard interaction != nil else { return }
+    finish(celebratingAt: nil)
+  }
+
+  private func finish(celebratingAt index: Int?) {
+    guard let triggerId = interaction?.triggerId else { return }
+    interaction = nil
 
     disabledScrollView?.panGestureRecognizer.isEnabled = true
     disabledScrollView = nil
-
-    activeTriggerId = nil
-    activeItems = []
-    activeShowsPlus = false
-    focusedIndex = nil
 
     let picker = pickerView
     // Teardown is bound to animation-end, not touch-up: onSelect has already
@@ -488,7 +497,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       picker?.resetAfterDismissal()
     }
 
-    if let index = celebratedIndex {
+    if let index {
       // A firmer confirm than the per-item tick; the generator is prepared, so
       // it lands with the pop.
       haptics?.impactOccurred(intensity: 1.0)
@@ -500,6 +509,23 @@ class HybridReactionsHost: HybridReactionsHostSpec {
 
     haptics = nil
     onClose?(triggerId)
+  }
+}
+
+// MARK: - Outcome
+
+private extension Outcome {
+  /// The slot the celebration plays on. It plays whether the release committed
+  /// a new selection, cleared the existing one, or opened the emoji picker —
+  /// either way the user chose that slot. `.cancel` chose nothing, and the
+  /// enum is what makes "celebrate at no index" unrepresentable.
+  var celebratedIndex: Int? {
+    switch self {
+    case .select(_, let index), .deselect(let index), .another(let index):
+      return index
+    case .cancel:
+      return nil
+    }
   }
 }
 

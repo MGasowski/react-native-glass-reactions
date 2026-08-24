@@ -73,7 +73,13 @@ internal data class Renderable(
     val accessibilityLabel: String
 )
 
-internal class ReactionsPillView(context: android.content.Context) : ViewGroup(context) {
+/**
+ * Implements [SlotGeometry] because it is the layout authority: the same
+ * `slotCenterX` that positions the reactions is what the interaction hit-tests
+ * against, so the two can never disagree about where a slot is.
+ */
+internal class ReactionsPillView(context: android.content.Context) :
+    ViewGroup(context), SlotGeometry {
 
     private val density = context.resources.displayMetrics.density
     private val itemSize = dp(Metrics.ITEM_SIZE_DP)
@@ -143,7 +149,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
     }
 
     /** The slot nearest the given local x, clamped to the row. */
-    fun slotIndex(localX: Float): Int? {
+    override fun slotIndex(localX: Float): Int? {
         if (renderables.isEmpty()) return null
         return renderables.indices.minByOrNull { abs(localX - slotCenterX(it)) }
     }
@@ -195,7 +201,7 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
      */
     private var baseAlphas: List<Float> = emptyList()
 
-    fun apply(items: List<Renderable>, selectedId: String?, separatorAfter: Int?) {
+    private fun apply(items: List<Renderable>, selectedId: String?, separatorAfter: Int?) {
         renderables = items
         this.separatorAfter = separatorAfter
 
@@ -233,46 +239,47 @@ internal class ReactionsPillView(context: android.content.Context) : ViewGroup(c
      * Symbols font shipped in the AAR. Because `emoji` is required on every item
      * (spec §5), falling back costs nothing and never blanks the picker.
      */
-    fun applyItems(
-        items: Array<NativeReactionItem>,
-        selectedId: String?,
-        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode,
-        customEmoji: String?,
-        showPlus: Boolean,
-        anotherAppearance: NativeAnotherReaction? = null
-    ) {
-        val renderables = items.map {
-            Renderable(it.id, rasteriseEmoji(it.emoji), it.accessibilityLabel)
-        }.toMutableList()
-        if (showPlus) {
-            // The custom pick's id is the emoji itself — it exists in no item
-            // list, so the emoji is the only stable identity it has.
-            if (!customEmoji.isNullOrEmpty()) {
-                renderables.add(
-                    Renderable(customEmoji, rasteriseEmoji(customEmoji), customEmoji)
-                )
-            }
-            // The item is chrome, not a reaction: drawn rather than taken from
-            // an emoji font, so it reads as part of the picker instead of one
-            // more choice. A consumer-supplied emoji replaces the drawing —
-            // `symbolAndroid` cannot, for the same reason items ignore it here.
-            val overrideEmoji = anotherAppearance?.emoji?.takeIf { it.isNotEmpty() }
-            renderables.add(
-                Renderable(
-                    ANOTHER_REACTION_ID,
-                    if (overrideEmoji != null) {
-                        rasteriseEmoji(overrideEmoji)
-                    } else {
-                        rasteriseAnotherReaction(anotherAppearance?.badge ?: true)
-                    },
-                    anotherAppearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
-                )
+    /**
+     * Draws one row of slots.
+     *
+     * Renderables are *derived from* the interaction's slots rather than built
+     * alongside them, which is what makes it impossible for the drawn row and
+     * the hit-tested row to disagree about what sits at a given index.
+     */
+    fun apply(slots: List<Slot>, selectedId: String?, renderMode: ReactionRenderMode) {
+        apply(slots.map { renderable(it, renderMode) }, selectedId, slots.separatorAfter)
+    }
+
+    private fun renderable(
+        slot: Slot,
+        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode
+    ): Renderable = when (slot) {
+        is Slot.Reaction -> Renderable(
+            slot.reaction.id,
+            rasteriseEmoji(slot.reaction.emoji),
+            slot.reaction.accessibilityLabel
+        )
+
+        // The custom pick's id is the emoji itself — it exists in no item list,
+        // so the emoji is the only stable identity it has.
+        is Slot.Custom -> Renderable(slot.emoji, rasteriseEmoji(slot.emoji), slot.emoji)
+
+        // The item is chrome, not a reaction: drawn rather than taken from an
+        // emoji font, so it reads as part of the picker instead of one more
+        // choice. A consumer-supplied emoji replaces the drawing —
+        // `symbolAndroid` cannot, for the same reason items ignore it here.
+        is Slot.Another -> {
+            val overrideEmoji = slot.appearance?.emoji?.takeIf { it.isNotEmpty() }
+            Renderable(
+                ANOTHER_REACTION_ID,
+                if (overrideEmoji != null) {
+                    rasteriseEmoji(overrideEmoji)
+                } else {
+                    rasteriseAnotherReaction(slot.appearance?.badge ?: true)
+                },
+                slot.appearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
             )
         }
-        // Divider between the consumer's reactions and the "another reaction"
-        // section, drawn only when both sides exist.
-        val separatorAfter = if (showPlus && items.isNotEmpty()) items.size else null
-        apply(renderables, selectedId, separatorAfter)
     }
 
     companion object {

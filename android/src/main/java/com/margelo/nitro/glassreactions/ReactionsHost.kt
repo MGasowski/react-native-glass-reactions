@@ -2,7 +2,6 @@ package com.margelo.nitro.glassreactions
 
 import android.app.Activity
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
@@ -76,17 +75,14 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private var wrappedActivity: Activity? = null
 
     // Active interaction
-    private var activeTriggerId: String? = null
-    private var activeItems: Array<NativeReactionItem> = emptyArray()
 
     /**
-     * Whether the current interaction shows the trailing plus item. The plus
-     * occupies a slot after activeItems, so hit-testing counts it while
-     * selection reporting does not.
+     * The rules of the press currently in flight, or null when none is. Every
+     * question about focus and release goes here; the host only reacts to the
+     * answers. Null is the whole of "no interaction" — there is no separate
+     * focused index that can outlive it.
      */
-    private var activeShowsPlus = false
-    private var activeRect = Rect()
-    private var focusedIndex: Int? = null
+    private var interaction: PickerInteraction? = null
     private var pendingTrigger: Pair<String, View>? = null
     private var downX = 0f
     private var downY = 0f
@@ -118,7 +114,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         main.post {
             main.removeCallbacks(openRunnable)
             emojiSheet.dismiss()
-            dismiss(null, cancelled = true)
+            cancelInteraction()
             wrappedActivity?.window?.callback = originalCallback
             originalCallback = null
             wrappedActivity = null
@@ -171,7 +167,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             registrations.remove(triggerId)?.let { triggerIdByTag.remove(it.viewTag) }
             // A row recycled or scrolled away mid-interaction dismisses without
             // selection rather than leaving the picker anchored to nothing.
-            if (activeTriggerId == triggerId) dismiss(null, cancelled = true)
+            if (interaction?.triggerId == triggerId) cancelInteraction()
         }
     }
 
@@ -260,7 +256,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (activeTriggerId != null) {
+                if (interaction != null) {
                     updateFocus(event.rawX, event.rawY)
                 } else if (
                     abs(event.rawX - downX) > touchSlop ||
@@ -274,13 +270,13 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
             MotionEvent.ACTION_UP -> {
                 main.removeCallbacks(openRunnable)
-                if (activeTriggerId != null) end() else pendingTrigger = null
+                if (interaction != null) end() else pendingTrigger = null
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 main.removeCallbacks(openRunnable)
                 pendingTrigger = null
-                if (activeTriggerId != null) dismiss(null, cancelled = true)
+                if (interaction != null) cancelInteraction()
             }
         }
     }
@@ -372,30 +368,20 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         val layer = ensureOverlay(activity) ?: return
         val pill = picker ?: return
 
-        activeTriggerId = triggerId
-        activeShowsPlus = registration.anotherReaction ?: anotherReactionEnabled
-
-        // The custom pick rides with the plus: both belong to the "another
-        // reaction" section, so disabling the feature hides both.
-        val custom = registration.anotherSelected?.takeIf { it.isNotEmpty() }
-        activeItems = if (activeShowsPlus && custom != null) {
-            registration.items + NativeReactionItem(custom, custom, null, null, custom)
-        } else {
-            registration.items
-        }
+        val slots = slotsFor(registration)
 
         // Ownership of the touch is now unambiguous: stop ancestors (the list)
         // from intercepting so opening never scrolls (spec §6.4).
         triggerView.parent?.requestDisallowInterceptTouchEvent(true)
 
         // The pill matches the surface it floats over, not the system theme.
-        // Set before applyItems: the dashed-emoji glyph rasterises in this appearance.
+        // Set before apply: the dashed-emoji glyph rasterises in this appearance.
         pill.setSurfaceAppearance(isDarkSurface(triggerView))
-        pill.applyItems(
-            registration.items, registration.selectedId, renderMode,
-            if (activeShowsPlus) custom else null, activeShowsPlus,
-            registration.anotherAppearance ?: anotherReactionAppearance
-        )
+        // Drawn from the very list that will be hit-tested, in the same order,
+        // so the row on screen and the row the rules reason about cannot
+        // disagree.
+        pill.apply(slots, registration.selectedId, renderMode)
+
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         pill.measure(unspecified, unspecified)
 
@@ -430,88 +416,132 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         if (pill.parent == null) layer.addView(pill, params) else pill.layoutParams = params
         pill.animateIn()
 
-        activeRect.set(
-            left + overlayLocation[0],
-            top + overlayLocation[1],
-            left + overlayLocation[0] + width,
-            top + overlayLocation[1] + height
+        // Everything the rules need, frozen at this instant — selectedId
+        // included. The user is choosing against the pill just drawn, so that
+        // is what the deselect comparison has to be made against; re-reading
+        // the registry at release time would compare against something never
+        // shown.
+        val screenLeft = (left + overlayLocation[0]).toFloat()
+        val screenTop = (top + overlayLocation[1]).toFloat()
+        interaction = PickerInteraction(
+            triggerId = triggerId,
+            slots = slots,
+            selectedId = registration.selectedId,
+            pickerFrame = PickerFrame(
+                left = screenLeft,
+                top = screenTop,
+                right = screenLeft + width,
+                bottom = screenTop + height
+            ),
+            tolerance = focusTolerancePx.toFloat(),
+            geometry = pill
         )
+
         // No initial focus: the finger is still on the row that was pressed,
         // not on a reaction.
-        focusedIndex = null
         pill.setFocusedIndex(null)
         pendingTrigger = null
         onOpen?.invoke(triggerId)
     }
 
-    private fun indexAt(x: Float, y: Float): Int? {
-        // Just enough tolerance to stop the selection flickering at the edge,
-        // not enough to keep selecting from well outside the picker. This was
-        // 160px — roughly a centimetre — which selected reactions from far
-        // below the picker.
-        val slack = focusTolerancePx
-        if (x < activeRect.left || x > activeRect.right) return null
-        if (y < activeRect.top - slack || y > activeRect.bottom + slack) return null
-        // The pill owns the slot geometry: slots are not uniform once the
-        // section separator inserts its extra width, so a plain stride drifts.
-        return picker?.slotIndex(x - activeRect.left)
+    // MARK: Mapping
+
+    /** The registration flattened into the one list the interaction reasons over. */
+    private fun slotsFor(registration: TriggerRegistration): List<Slot> {
+        val slots = registration.items.map {
+            Slot.Reaction(
+                Reaction(
+                    id = it.id,
+                    emoji = it.emoji,
+                    symbolIos = it.symbolIos,
+                    symbolAndroid = it.symbolAndroid,
+                    accessibilityLabel = it.accessibilityLabel
+                )
+            )
+        }.toMutableList<Slot>()
+
+        if (registration.anotherReaction ?: anotherReactionEnabled) {
+            // The custom pick rides with the plus: both belong to the "another
+            // reaction" section, so disabling the feature hides both.
+            registration.anotherSelected?.takeIf { it.isNotEmpty() }?.let {
+                slots.add(Slot.Custom(it))
+            }
+            slots.add(
+                Slot.Another(
+                    appearance(registration.anotherAppearance ?: anotherReactionAppearance)
+                )
+            )
+        }
+        return slots
     }
 
+    /**
+     * Maps the Nitro transport struct onto the interaction's own type. The
+     * generated struct stops here and goes no further in.
+     */
+    private fun appearance(native: NativeAnotherReaction?): AnotherReactionAppearance? =
+        native?.let {
+            AnotherReactionAppearance(
+                symbolIos = it.symbolIos,
+                symbolAndroid = it.symbolAndroid,
+                emoji = it.emoji,
+                badge = it.badge,
+                accessibilityLabel = it.accessibilityLabel
+            )
+        }
+
+    // MARK: Focus and release
+
     private fun updateFocus(x: Float, y: Float) {
-        val next = indexAt(x, y)
-        if (next == focusedIndex) return
-        focusedIndex = next
-        picker?.setFocusedIndex(next)
-        if (next != null) {
-            // Same code path as the visual change, so they land together.
-            picker?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        when (val change = interaction?.focus(x, y) ?: return) {
+            is FocusChange.Unchanged -> Unit
+            is FocusChange.Moved -> {
+                picker?.setFocusedIndex(change.to)
+                // Same code path as the visual change, so they land together.
+                picker?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+
+            is FocusChange.Cleared -> picker?.setFocusedIndex(null)
         }
     }
 
     private fun end() {
-        val triggerId = activeTriggerId ?: return
-        val current = registrations[triggerId]?.selectedId
-        val index = focusedIndex
+        val current = interaction ?: return
+        val triggerId = current.triggerId
+        val outcome = current.release()
 
-        // Releasing on the plus is not a selection: the celebration plays, but
-        // the interaction hands over to the emoji picker instead of reporting
-        // through onSelect.
-        if (activeShowsPlus && index == activeItems.size) {
-            dismiss(null, cancelled = false, reportSelection = false)
+        when (outcome) {
+            is Outcome.Select -> onSelect?.invoke(triggerId, outcome.reactionId)
+            is Outcome.Deselect -> onSelect?.invoke(triggerId, null)
+            // Releasing on the plus is not a selection: the celebration still
+            // plays, but the interaction hands over to the emoji picker below.
+            is Outcome.Another, is Outcome.Cancel -> Unit
+        }
+
+        finish(outcome.celebratedIndex)
+
+        if (outcome is Outcome.Another) {
             currentActivity()?.let { activity ->
                 emojiSheet.present(activity) { emoji ->
                     onSelectAnother?.invoke(triggerId, emoji)
                 }
             }
-            return
         }
-
-        val selection = if (index != null && index < activeItems.size) {
-            val candidate = activeItems[index].id
-            // Upsert with deselect (spec §5).
-            if (candidate == current) null else candidate
-        } else {
-            null
-        }
-        dismiss(selection, cancelled = index == null)
     }
 
-    private fun dismiss(
-        selected: String?, cancelled: Boolean, reportSelection: Boolean = true
-    ) {
-        val triggerId = activeTriggerId ?: return
+    /**
+     * A press that never released: the gesture was cancelled, the row was
+     * recycled out from under it, or the host was deactivated. There is no
+     * outcome because there was no release — the interaction is simply dropped.
+     */
+    private fun cancelInteraction() {
+        if (interaction == null) return
+        finish(null)
+    }
 
-        if (!cancelled && reportSelection) onSelect?.invoke(triggerId, selected)
-
-        // The celebration plays on whatever was under the finger, whether that
-        // committed a new selection or cleared the existing one — either way
-        // the user chose that reaction.
-        val celebratedIndex = if (cancelled) null else focusedIndex
-
-        activeTriggerId = null
-        activeItems = emptyArray()
-        activeShowsPlus = false
-        focusedIndex = null
+    private fun finish(celebratedIndex: Int?) {
+        val triggerId = interaction?.triggerId ?: return
+        interaction = null
 
         val pill = picker
         // Teardown is bound to animation-end, not touch-up: onSelect has fired
@@ -522,7 +552,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
         if (celebratedIndex != null && pill != null) {
             // A firmer confirm than the per-item tick.
-            pill?.performHapticFeedback(
+            pill.performHapticFeedback(
                 if (android.os.Build.VERSION.SDK_INT >= 30)
                     HapticFeedbackConstants.CONFIRM
                 else
@@ -538,6 +568,20 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         onClose?.invoke(triggerId)
     }
 }
+
+/**
+ * The slot the celebration plays on. It plays whether the release committed a
+ * new selection, cleared the existing one, or opened the emoji picker — either
+ * way the user chose that slot. `Cancel` chose nothing, and the sealed type is
+ * what makes "celebrate at no index" unrepresentable.
+ */
+private val Outcome.celebratedIndex: Int?
+    get() = when (this) {
+        is Outcome.Select -> at
+        is Outcome.Deselect -> at
+        is Outcome.Another -> at
+        is Outcome.Cancel -> null
+    }
 
 /**
  * Delegates every Window.Callback member to the original and sniffs touches on

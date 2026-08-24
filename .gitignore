@@ -88,3 +88,6 @@ android/generated
 
 # config plugin build output
 plugin/build/
+
+# swift package manager output, from `swift test` on the interaction policy
+.build/
