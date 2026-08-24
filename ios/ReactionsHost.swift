@@ -307,20 +307,18 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       separatorAfter: slots.separatorAfter
     )
 
-    // Frame resolved from the live view, not from anything JS measured.
+    // Frame resolved from the live view, not from anything JS measured. The
+    // overlay is a `UIWindow` covering the full screen, so window space and
+    // overlay space already coincide — `triggerFrame` needs no further
+    // translation before `PickerLayout` can use it.
     let triggerFrame = triggerView.convert(triggerView.bounds, to: nil)
-    let size = picker.intrinsicContentSize
-    var origin = CGPoint(
-      x: triggerFrame.midX - size.width / 2,
-      y: triggerFrame.minY - size.height - Layout.verticalOffset
+    let pickerFrame = PickerLayout.frame(
+      trigger: triggerFrame,
+      pillSize: picker.intrinsicContentSize,
+      containerSize: overlay.bounds.size,
+      verticalGap: Layout.verticalOffset,
+      edgeMargin: Layout.screenMargin
     )
-    let bounds = overlay.bounds
-    origin.x = min(
-      max(Layout.screenMargin, origin.x),
-      max(Layout.screenMargin, bounds.width - size.width - Layout.screenMargin)
-    )
-    origin.y = max(Layout.screenMargin, origin.y)
-    let pickerFrame = CGRect(origin: origin, size: size)
 
     // Geometry via bounds and center, never `frame`: prepareForPresentation
     // applies the collapsed scale transform, and assigning `frame` to a
@@ -329,7 +327,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // left with dead space on the right. The center accounts for the (0.5, 1)
     // anchor prepareForPresentation sets.
     picker.prepareForPresentation()
-    picker.bounds = CGRect(origin: .zero, size: size)
+    picker.bounds = CGRect(origin: .zero, size: pickerFrame.size)
     picker.center = CGPoint(x: pickerFrame.midX, y: pickerFrame.maxY)
     // Attached once and then only hidden/unhidden: re-attaching a glass
     // effect view replays UIKit's frosted "materialize" animation, which is
