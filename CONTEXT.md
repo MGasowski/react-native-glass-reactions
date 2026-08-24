@@ -20,8 +20,10 @@ is its React-side switch. There is exactly one, which is what makes "only one
 picker can exist" structural rather than a matter of where components are placed.
 
 **Pill** — the floating capsule that appears above the trigger: glass on iOS 26,
-blur below that, opaque under Reduce Transparency. `ReactionsPillView`. It is the
-layout authority — it owns slot positions and is therefore what hit-testing asks.
+blur below that, opaque under Reduce Transparency. `ReactionsPillView`. It is
+`SlotGeometry`'s one implementation, and therefore what hit-testing asks — but
+the geometry itself is `Slot layout`'s, not something the pill computes on its
+own.
 
 **Overlay** — the window (iOS) or full-screen layer (Android) the pill is
 presented in. A presentation surface only: it never takes touches.
@@ -33,6 +35,13 @@ the trigger, sitting `verticalGap` above it, clamped so it never crosses
 local coordinate space, so the one genuinely platform-specific step — Android's
 `getLocationOnScreen` translation, which iOS's full-screen `UIWindow` overlay
 never needs — stays in the host rather than in this module.
+
+**Slot layout** — where each slot sits along the row, and which one a point is
+nearest to. `SlotLayout`. Pure and mirrored, like `PickerInteraction`; the pill
+delegates to it both to position its own image views and to answer
+`SlotGeometry`'s hit-test, so the two can never independently drift. Constants
+(item size, spacing, separator width) are parameters, the same pattern as
+`PickerInteraction.tolerance` and `PickerLayout`'s gap/margin.
 
 ## Content
 

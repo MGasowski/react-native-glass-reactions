@@ -190,22 +190,22 @@ internal class ReactionsPillView(context: android.content.Context) :
     // MARK: Slot geometry
 
     /**
-     * Centre of slot `index` in the pill's own coordinates. Single source of
-     * truth for layout, hit-testing, and the selection flight vector — slots
-     * are not uniform once the separator inserts its extra width.
+     * Centre of slot [index] in the pill's own coordinates. Delegates to
+     * [SlotLayout], which both this and [slotIndex] below call into — the
+     * single source of truth for layout, hit-testing, and the selection
+     * flight vector — slots are not uniform once the separator inserts its
+     * extra width.
      */
-    fun slotCenterX(index: Int): Float {
-        var x = contentInset + index * (itemSize + itemSpacing) + itemSize / 2f
-        val after = separatorAfter
-        if (after != null && index >= after) x += separatorExtra
-        return x
-    }
+    fun slotCenterX(index: Int): Float = SlotLayout.centerX(
+        index, itemSize.toFloat(), itemSpacing.toFloat(), contentInset.toFloat(),
+        separatorAfter, separatorExtra.toFloat()
+    )
 
     /** The slot nearest the given local x, clamped to the row. */
-    override fun slotIndex(localX: Float): Int? {
-        if (renderables.isEmpty()) return null
-        return renderables.indices.minByOrNull { abs(localX - slotCenterX(it)) }
-    }
+    override fun slotIndex(localX: Float): Int? = SlotLayout.nearestIndex(
+        localX, renderables.size, itemSize.toFloat(), itemSpacing.toFloat(),
+        contentInset.toFloat(), separatorAfter, separatorExtra.toFloat()
+    )
 
     private fun dp(value: Float): Int =
         TypedValue.applyDimension(
