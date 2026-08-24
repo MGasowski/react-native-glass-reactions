@@ -234,12 +234,6 @@ internal class ReactionsPillView(context: android.content.Context) :
     private fun baseAlpha(index: Int): Float = baseAlphas.getOrElse(index) { 1f }
 
     /**
-     * Resolution entry point shared with the host. Android renders emoji only in
-     * 1.0 — `symbolAndroid` names a Material Symbol, which needs the Material
-     * Symbols font shipped in the AAR. Because `emoji` is required on every item
-     * (spec §5), falling back costs nothing and never blanks the picker.
-     */
-    /**
      * Draws one row of slots.
      *
      * Renderables are *derived from* the interaction's slots rather than built
@@ -250,36 +244,54 @@ internal class ReactionsPillView(context: android.content.Context) :
         apply(slots.map { renderable(it, renderMode) }, selectedId, slots.separatorAfter)
     }
 
-    private fun renderable(
-        slot: Slot,
-        @Suppress("UNUSED_PARAMETER") renderMode: ReactionRenderMode
-    ): Renderable = when (slot) {
-        is Slot.Reaction -> Renderable(
-            slot.reaction.id,
-            rasteriseEmoji(slot.reaction.emoji),
-            slot.reaction.accessibilityLabel
-        )
+    /**
+     * The *order* to try is [ReactionResolution]'s call — pure, and mirrored
+     * from `ios/ReactionResolution.swift`. This function's only job is to walk
+     * that order and draw the first candidate that actually rasterises.
+     * Android renders emoji only in 1.0 (`symbolsSupported = false`), so in
+     * practice the order never offers a symbol and this always draws an emoji
+     * or the built-in glyph — but the walk itself does not know that, which is
+     * what lets Android gain symbol support later by flipping one flag rather
+     * than rewriting this function.
+     */
+    private fun renderable(slot: Slot, renderMode: ReactionRenderMode): Renderable {
+        val mode = if (renderMode == ReactionRenderMode.AUTO) RenderMode.Auto else RenderMode.Emoji
+        val order = ReactionResolution.resolutionOrder(slot, mode, symbolsSupported = false)
 
-        // The custom pick's id is the emoji itself — it exists in no item list,
-        // so the emoji is the only stable identity it has.
-        is Slot.Custom -> Renderable(slot.emoji, rasteriseEmoji(slot.emoji), slot.emoji)
-
-        // The item is chrome, not a reaction: drawn rather than taken from an
-        // emoji font, so it reads as part of the picker instead of one more
-        // choice. A consumer-supplied emoji replaces the drawing —
-        // `symbolAndroid` cannot, for the same reason items ignore it here.
-        is Slot.Another -> {
-            val overrideEmoji = slot.appearance?.emoji?.takeIf { it.isNotEmpty() }
-            Renderable(
-                ANOTHER_REACTION_ID,
-                if (overrideEmoji != null) {
-                    rasteriseEmoji(overrideEmoji)
-                } else {
-                    rasteriseAnotherReaction(slot.appearance?.badge ?: true)
-                },
-                slot.appearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
-            )
+        for (candidate in order) {
+            val image = image(candidate) ?: continue
+            return Renderable(id(slot), image, label(slot))
         }
+
+        // Unreached in practice: the chain always ends in Emoji or BuiltIn, and
+        // NativeReactionItem.emoji is required, so only an empty custom pick
+        // could get here.
+        return Renderable(id(slot), null, label(slot))
+    }
+
+    private fun image(candidate: Candidate): Bitmap? = when (candidate) {
+        // Android has no symbol rasteriser in 1.0 — these are unreachable
+        // while resolutionOrder is called with symbolsSupported = false, kept
+        // exhaustive rather than throwing so a future symbol-supporting build
+        // degrades gracefully to emoji instead of crashing.
+        is Candidate.Symbol -> null
+        is Candidate.AnotherSymbol -> null
+        is Candidate.Emoji -> rasteriseEmoji(candidate.value)
+        is Candidate.BuiltIn -> rasteriseAnotherReaction(candidate.badge)
+    }
+
+    private fun id(slot: Slot): String = when (slot) {
+        is Slot.Reaction -> slot.reaction.id
+        // The custom pick's id is the emoji itself — it exists in no item
+        // list, so the emoji is the only stable identity it has.
+        is Slot.Custom -> slot.emoji
+        is Slot.Another -> ANOTHER_REACTION_ID
+    }
+
+    private fun label(slot: Slot): String = when (slot) {
+        is Slot.Reaction -> slot.reaction.accessibilityLabel
+        is Slot.Custom -> slot.emoji
+        is Slot.Another -> slot.appearance?.accessibilityLabel ?: ANOTHER_REACTION_LABEL
     }
 
     companion object {

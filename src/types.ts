@@ -42,15 +42,17 @@ export type ReactionRenderMode = 'auto' | 'emoji';
  * dashed-emoji-with-a-plus glyph, and omitting a field keeps that field's
  * default.
  *
- * Resolution mirrors `ReactionItem` (spec §5): a symbol is preferred where one
- * is supplied and resolvable, `emoji` is the fallback, and `renderMode: 'emoji'`
- * forces `emoji` when one is supplied. When nothing renders, the built-in glyph
- * does — the item never blanks.
+ * Resolution mirrors `ReactionItem` (spec §5): `symbol` is preferred over
+ * `emoji` when supplied and resolvable, but only under `renderMode: 'auto'` —
+ * `renderMode: 'emoji'` skips a supplied symbol exactly as it does for items,
+ * so the kill switch has no exception for chrome. When nothing renders, the
+ * built-in glyph does — the item never blanks.
  */
 export interface AnotherReactionAppearance {
   /**
    * Per-platform symbol name. `android` is accepted but ignored in 1.x, which
-   * renders emoji only — supply `emoji` to customise Android.
+   * renders emoji only — supply `emoji` to customise Android. Ignored
+   * entirely under `renderMode: 'emoji'`, like `ReactionItem.symbol`.
    */
   readonly symbol?: ReactionSymbol;
   /** Used when no symbol renders, and under `renderMode: 'emoji'`. */
