@@ -90,6 +90,12 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     /** Tolerance around the picker before the selection is cleared. */
     private var focusTolerancePx = 0
 
+    /** Gap between the top of the trigger and the bottom of the picker. */
+    private var verticalGapPx = 0
+
+    /** How close the picker may sit to the edge of the screen. */
+    private var edgeMarginPx = 0
+
     private val openRunnable = Runnable { openPicker() }
 
     override val isLiquidGlassSupported: Boolean
@@ -193,6 +199,15 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
 
         touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
         focusTolerancePx = (12 * activity.resources.displayMetrics.density).toInt()
+        // Distinct from `focusTolerancePx`, even though both happened to read
+        // 12 before this: one is how far a finger may stray and still count
+        // as pointing at a slot, the other is how close the picker may sit to
+        // the screen edge. `verticalGapPx` used to be the same value as
+        // `edgeMarginPx` too — a single `margin` doing both jobs — which put
+        // the pill 4dp further from the trigger on Android than iOS's
+        // matching 8pt/12pt split. See PickerLayout.
+        verticalGapPx = (8 * activity.resources.displayMetrics.density).toInt()
+        edgeMarginPx = (12 * activity.resources.displayMetrics.density).toInt()
         originalCallback = window.callback
         wrappedActivity = activity
         window.callback = TouchInterceptor(window.callback, ::handleTouch)
@@ -339,16 +354,33 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         layer.getLocationOnScreen(overlayLocation)
 
         val metrics = activity.resources.displayMetrics
-        val margin = (12 * metrics.density).toInt()
-        // The overlay reports width 0 until it has been through a layout pass,
-        // which it has not on the first open. Clamping against that pins the
-        // picker to the left margin and — worse — puts the hit rectangle
-        // somewhere the finger never goes, so nothing is ever selected.
-        val available = if (layer.width > 0) layer.width else metrics.widthPixels
+        // The overlay reports width/height 0 until it has been through a
+        // layout pass, which it has not on the first open. Clamping against
+        // that pins the picker to the left margin and — worse — puts the hit
+        // rectangle somewhere the finger never goes, so nothing is ever
+        // selected.
+        val availableWidth = if (layer.width > 0) layer.width else metrics.widthPixels
+        val availableHeight = if (layer.height > 0) layer.height else metrics.heightPixels
 
-        val left = (location[0] + triggerView.width / 2 - width / 2 - overlayLocation[0])
-            .coerceIn(margin, (available - width - margin).coerceAtLeast(margin))
-        val top = (location[1] - overlayLocation[1] - height - margin).coerceAtLeast(margin)
+        // PickerLayout works in the overlay's own local space, so the trigger
+        // is translated into it here — the one platform-specific step: iOS's
+        // overlay is a full-screen UIWindow, so window space and overlay
+        // space already coincide and no such translation exists there.
+        val triggerLocal = PickerFrame(
+            left = (location[0] - overlayLocation[0]).toFloat(),
+            top = (location[1] - overlayLocation[1]).toFloat(),
+            right = (location[0] - overlayLocation[0] + triggerView.width).toFloat(),
+            bottom = (location[1] - overlayLocation[1] + triggerView.height).toFloat()
+        )
+        val localFrame = PickerLayout.frame(
+            trigger = triggerLocal,
+            pillSize = Size(width.toFloat(), height.toFloat()),
+            containerSize = Size(availableWidth.toFloat(), availableHeight.toFloat()),
+            verticalGap = verticalGapPx.toFloat(),
+            edgeMargin = edgeMarginPx.toFloat()
+        )
+        val left = localFrame.left.toInt()
+        val top = localFrame.top.toInt()
 
         // Explicit LayoutParams rather than a manual layout() call: FrameLayout
         // re-lays its children out on its own pass, and without params the
@@ -366,8 +398,12 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         // is what the deselect comparison has to be made against; re-reading
         // the registry at release time would compare against something never
         // shown.
-        val screenLeft = (left + overlayLocation[0]).toFloat()
-        val screenTop = (top + overlayLocation[1]).toFloat()
+        //
+        // PickerInteraction hit-tests against raw touch coordinates
+        // (screen-absolute), unlike PickerLayout's overlay-local input, so
+        // the overlay's screen offset is added back here.
+        val screenLeft = localFrame.left + overlayLocation[0]
+        val screenTop = localFrame.top + overlayLocation[1]
         interaction = PickerInteraction(
             triggerId = triggerId,
             slots = slots,

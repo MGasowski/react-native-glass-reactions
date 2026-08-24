@@ -26,6 +26,14 @@ layout authority — it owns slot positions and is therefore what hit-testing as
 **Overlay** — the window (iOS) or full-screen layer (Android) the pill is
 presented in. A presentation surface only: it never takes touches.
 
+**Layout** (positioning) — where the pill goes within the overlay: centred above
+the trigger, sitting `verticalGap` above it, clamped so it never crosses
+`edgeMargin` from the overlay's edges. `PickerLayout`. Pure and mirrored, like
+`PickerInteraction`; takes the trigger and overlay already in the overlay's own
+local coordinate space, so the one genuinely platform-specific step — Android's
+`getLocationOnScreen` translation, which iOS's full-screen `UIWindow` overlay
+never needs — stays in the host rather than in this module.
+
 ## Content
 
 **Slot** — one position in an open picker. Either a *reaction*, the *custom
