@@ -786,99 +786,82 @@ enum ReactionResolver {
   /// none. English-only, which is why `accessibilityLabel` is overridable.
   static let anotherReactionLabel = "Add another reaction"
 
-  /// The item is chrome, not a reaction, so with no override it renders as a
-  /// symbol regardless of `renderMode` — it represents the picker itself rather
-  /// than content. An override goes through the same fallback chain as items:
-  /// symbol first where one is supplied and resolves, else emoji. When neither
-  /// yields an image the built-in glyph does, so the slot never blanks.
-  static func anotherReactionRenderable(
-    appearance: AnotherReactionAppearance?,
-    renderMode: ReactionRenderMode
-  ) -> Renderable {
-    let label = appearance?.accessibilityLabel ?? anotherReactionLabel
-    let badge = appearance?.badge ?? true
-    let emoji = appearance?.emoji.flatMap { $0.isEmpty ? nil : $0 }
-
-    func renderable(_ image: UIImage?, isSymbol: Bool) -> Renderable {
-      Renderable(
-        id: anotherReactionId,
-        image: image,
-        isSymbol: isSymbol,
-        accessibilityLabel: label
-      )
-    }
-
-    if renderMode == .emoji, let emoji {
-      return renderable(ReactionRasteriser.emoji(emoji), isSymbol: false)
-    }
-    if let name = appearance?.symbolIos, !name.isEmpty,
-       let image = ReactionRasteriser.anotherReaction(symbolName: name, badge: badge) {
-      return renderable(image, isSymbol: true)
-    }
-    if let emoji {
-      return renderable(ReactionRasteriser.emoji(emoji), isSymbol: false)
-    }
-    return renderable(
-      ReactionRasteriser.anotherReaction(badge: badge),
-      isSymbol: true
-    )
-  }
-
-  /// The custom emoji previously picked through "another reaction". Its id is
-  /// the emoji itself — it exists in no item list, so the emoji is the only
-  /// stable identity it has.
-  static func customRenderable(emoji: String) -> Renderable {
-    Renderable(
-      id: emoji,
-      image: ReactionRasteriser.emoji(emoji),
-      isSymbol: false,
-      accessibilityLabel: emoji
-    )
-  }
-
   /// The single entry point: one slot in, one drawable out.
   ///
   /// Renderables are *derived from* the interaction's slots rather than built
   /// alongside them, which is what makes it impossible for the drawn row and
   /// the hit-tested row to disagree about what sits at a given index.
+  ///
+  /// The *order* to try is `ReactionResolution`'s call — pure, and shared with
+  /// Android via a mirrored file. This function's only job is to walk that
+  /// order and draw the first candidate that actually rasterises: whether a
+  /// supplied symbol name resolves to an image is a question only
+  /// `ReactionRasteriser` can answer, which is exactly why the pure module
+  /// hands back a chain instead of one resolved choice.
   static func renderable(
     for slot: Slot,
     renderMode: ReactionRenderMode
   ) -> Renderable {
-    switch slot {
-    case .reaction(let reaction):
-      return renderable(for: reaction, renderMode: renderMode)
-    case .custom(let emoji):
-      return customRenderable(emoji: emoji)
-    case .another(let appearance):
-      return anotherReactionRenderable(
-        appearance: appearance, renderMode: renderMode
-      )
+    let mode: RenderMode = renderMode == .auto ? .auto : .emoji
+    let order = ReactionResolution.resolutionOrder(
+      for: slot, renderMode: mode, symbolsSupported: true
+    )
+
+    for candidate in order {
+      if let image = image(for: candidate) {
+        return Renderable(
+          id: id(for: slot),
+          image: image,
+          isSymbol: isSymbol(candidate),
+          accessibilityLabel: label(for: slot)
+        )
+      }
+    }
+
+    // Unreached in practice: the chain always ends in `.emoji` or `.builtIn`,
+    // and `NativeReactionItem.emoji` is required, so only an empty custom pick
+    // could get here. Drawing nothing is still better than force-unwrapping.
+    return Renderable(
+      id: id(for: slot), image: nil, isSymbol: false, accessibilityLabel: label(for: slot)
+    )
+  }
+
+  private static func image(for candidate: Candidate) -> UIImage? {
+    switch candidate {
+    case .symbol(let name):
+      return ReactionRasteriser.symbol(name)
+    case .anotherSymbol(let name, let badge):
+      return ReactionRasteriser.anotherReaction(symbolName: name, badge: badge)
+    case .emoji(let value):
+      return ReactionRasteriser.emoji(value)
+    case .builtIn(let badge):
+      return ReactionRasteriser.anotherReaction(badge: badge)
     }
   }
 
-  private static func renderable(
-    for reaction: Reaction,
-    renderMode: ReactionRenderMode
-  ) -> Renderable {
-    var image: UIImage?
-    var isSymbol = false
+  /// Whether the drawn image should be tinted like a symbol. True for every
+  /// candidate but `.emoji` — the built-in glyph is itself a template-rendered
+  /// symbol image, not content, so it tints the same way a supplied one would.
+  private static func isSymbol(_ candidate: Candidate) -> Bool {
+    if case .emoji = candidate { return false }
+    return true
+  }
 
-    if renderMode == .auto, let name = reaction.symbolIos, !name.isEmpty {
-      image = ReactionRasteriser.symbol(name)
-      isSymbol = image != nil
+  private static func id(for slot: Slot) -> String {
+    switch slot {
+    case .reaction(let reaction): return reaction.id
+    // The custom pick's id is the emoji itself — it exists in no item list,
+    // so the emoji is the only stable identity it has.
+    case .custom(let emoji): return emoji
+    case .another: return anotherReactionId
     }
+  }
 
-    if image == nil {
-      image = ReactionRasteriser.emoji(reaction.emoji)
-      isSymbol = false
+  private static func label(for slot: Slot) -> String {
+    switch slot {
+    case .reaction(let reaction): return reaction.accessibilityLabel
+    case .custom(let emoji): return emoji
+    case .another(let appearance): return appearance?.accessibilityLabel ?? anotherReactionLabel
     }
-
-    return Renderable(
-      id: reaction.id,
-      image: image,
-      isSymbol: isSymbol,
-      accessibilityLabel: reaction.accessibilityLabel
-    )
   }
 }

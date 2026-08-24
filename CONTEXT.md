@@ -35,9 +35,19 @@ interaction; drawing, hit-testing and selection reporting all index into it.
 **Renderable** — a slot resolved down to what is actually drawn: an image, a
 label, and whether it is a symbol. Derived from a slot, never built beside one.
 
+**Resolution order** — the ranked list of ways a slot *could* be drawn — a
+`Candidate` list from `ReactionResolution`, e.g. "try this symbol, else this
+emoji, else the built-in glyph". Pure: it never asks whether a symbol name
+actually rasterises, only what order to try. The adapter (the pill) draws the
+first candidate that produces an image. Every order ends in an emoji or the
+built-in glyph, neither of which can fail to draw, so a slot never blanks.
+
 **Render mode** — `auto` prefers a platform symbol where one is supplied and
-resolves, `emoji` forces emoji everywhere. Android is emoji-only in 1.x, so it
-ignores the mode.
+resolves, `emoji` forces emoji everywhere and skips every symbol candidate,
+including chrome's. Android has no symbol rasteriser of its own yet
+(`symbolsSupported = false` in `ReactionResolution`), so its resolution order
+never offers one regardless of mode — a capability gap, not the mode being
+ignored.
 
 **Another reaction** — the trailing plus that opens the system emoji picker.
 Chrome rather than content: it is never reported through `onSelect`, and
