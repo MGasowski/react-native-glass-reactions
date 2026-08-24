@@ -62,6 +62,13 @@ both.
 reaction" section. Drawn only when both sides exist. It widens the slot it
 precedes, which is why slots are not uniformly spaced.
 
+**Surface appearance** — whether the pixels behind the trigger are dark. Sampled
+directly (`SurfaceAppearance.isDark`) rather than read from the system theme:
+the picker floats over arbitrary app content, so system light/dark says nothing
+about what is actually behind it. Named and placed identically on both
+platforms — beside the pill, even though the host is what calls it — because
+that placement, not just the name, is what a maintainer has to find twice.
+
 ## Interaction
 
 **Interaction** — one long-press, from open to release. `PickerInteraction` holds
