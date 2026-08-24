@@ -24,6 +24,9 @@ export default defineConfig([
     },
   },
   {
-    ignores: ['node_modules/', 'lib/', 'plugin/build/'],
+    // Build outputs. `**/build/` rather than the individual paths because
+    // Gradle writes an HTML test report — JavaScript and all — into
+    // android/build whenever the interaction-policy suite runs.
+    ignores: ['node_modules/', 'lib/', '**/build/', '.build/'],
   },
 ]);

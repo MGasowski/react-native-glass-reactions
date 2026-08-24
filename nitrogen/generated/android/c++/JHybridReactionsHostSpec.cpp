@@ -11,6 +11,8 @@
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 // Forward declaration of `NativeAnotherReaction` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeAnotherReaction; }
+// Forward declaration of `NativeTriggerPayload` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeTriggerPayload; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
@@ -20,6 +22,8 @@ namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 #include <optional>
 #include "JNativeAnotherReaction.hpp"
 #include <string>
+#include "NativeTriggerPayload.hpp"
+#include "JNativeTriggerPayload.hpp"
 #include "NativeReactionItem.hpp"
 #include <vector>
 #include "JNativeReactionItem.hpp"
@@ -74,31 +78,9 @@ namespace margelo::nitro::glassreactions {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("deactivate");
     method(_javaPart);
   }
-  void JHybridReactionsHostSpec::registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, double /* viewTag */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */, jni::alias_ref<jni::JBoolean> /* anotherReaction */, jni::alias_ref<jni::JString> /* anotherSelected */, jni::alias_ref<JNativeAnotherReaction> /* anotherReactionAppearance */)>("registerTrigger");
-    method(_javaPart, jni::make_jstring(triggerId), viewTag, [&](auto&& __input) {
-      size_t __size = __input.size();
-      jni::local_ref<jni::JArrayClass<JNativeReactionItem>> __array = jni::JArrayClass<JNativeReactionItem>::newArray(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        const auto& __element = __input[__i];
-        auto __elementJni = JNativeReactionItem::fromCpp(__element);
-        __array->setElement(__i, *__elementJni);
-      }
-      return __array;
-    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr, anotherReaction.has_value() ? jni::JBoolean::valueOf(anotherReaction.value()) : nullptr, anotherSelected.has_value() ? jni::make_jstring(anotherSelected.value()) : nullptr, anotherReactionAppearance.has_value() ? JNativeAnotherReaction::fromCpp(anotherReactionAppearance.value()) : nullptr);
-  }
-  void JHybridReactionsHostSpec::updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, jni::alias_ref<jni::JArrayClass<JNativeReactionItem>> /* items */, jni::alias_ref<jni::JString> /* selectedId */, jni::alias_ref<jni::JBoolean> /* anotherReaction */, jni::alias_ref<jni::JString> /* anotherSelected */, jni::alias_ref<JNativeAnotherReaction> /* anotherReactionAppearance */)>("updateTrigger");
-    method(_javaPart, jni::make_jstring(triggerId), [&](auto&& __input) {
-      size_t __size = __input.size();
-      jni::local_ref<jni::JArrayClass<JNativeReactionItem>> __array = jni::JArrayClass<JNativeReactionItem>::newArray(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        const auto& __element = __input[__i];
-        auto __elementJni = JNativeReactionItem::fromCpp(__element);
-        __array->setElement(__i, *__elementJni);
-      }
-      return __array;
-    }(items), selectedId.has_value() ? jni::make_jstring(selectedId.value()) : nullptr, anotherReaction.has_value() ? jni::JBoolean::valueOf(anotherReaction.value()) : nullptr, anotherSelected.has_value() ? jni::make_jstring(anotherSelected.value()) : nullptr, anotherReactionAppearance.has_value() ? JNativeAnotherReaction::fromCpp(anotherReactionAppearance.value()) : nullptr);
+  void JHybridReactionsHostSpec::syncTrigger(const std::string& triggerId, double viewTag, const NativeTriggerPayload& payload) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */, double /* viewTag */, jni::alias_ref<JNativeTriggerPayload> /* payload */)>("syncTrigger");
+    method(_javaPart, jni::make_jstring(triggerId), viewTag, JNativeTriggerPayload::fromCpp(payload));
   }
   void JHybridReactionsHostSpec::unregisterTrigger(const std::string& triggerId) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* triggerId */)>("unregisterTrigger");

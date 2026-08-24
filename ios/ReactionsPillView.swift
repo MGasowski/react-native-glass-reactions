@@ -135,7 +135,10 @@ struct Renderable {
 
 // MARK: - View
 
-final class ReactionsPillView: UIView {
+/// Conforms to `SlotGeometry` because it is the layout authority: the same
+/// `slotCenterX` that positions the reactions is what the interaction hit-tests
+/// against, so the two can never disagree about where a slot is.
+final class ReactionsPillView: UIView, SlotGeometry {
 
   private var renderables: [Renderable] = []
   private var imageViews: [UIImageView] = []
@@ -789,7 +792,7 @@ enum ReactionResolver {
   /// symbol first where one is supplied and resolves, else emoji. When neither
   /// yields an image the built-in glyph does, so the slot never blanks.
   static func anotherReactionRenderable(
-    appearance: NativeAnotherReaction?,
+    appearance: AnotherReactionAppearance?,
     renderMode: ReactionRenderMode
   ) -> Renderable {
     let label = appearance?.accessibilityLabel ?? anotherReactionLabel
@@ -833,30 +836,49 @@ enum ReactionResolver {
     )
   }
 
-  static func resolve(
-    _ items: [NativeReactionItem],
+  /// The single entry point: one slot in, one drawable out.
+  ///
+  /// Renderables are *derived from* the interaction's slots rather than built
+  /// alongside them, which is what makes it impossible for the drawn row and
+  /// the hit-tested row to disagree about what sits at a given index.
+  static func renderable(
+    for slot: Slot,
     renderMode: ReactionRenderMode
-  ) -> [Renderable] {
-    items.map { item in
-      var image: UIImage?
-      var isSymbol = false
-
-      if renderMode == .auto, let name = item.symbolIos, !name.isEmpty {
-        image = ReactionRasteriser.symbol(name)
-        isSymbol = image != nil
-      }
-
-      if image == nil {
-        image = ReactionRasteriser.emoji(item.emoji)
-        isSymbol = false
-      }
-
-      return Renderable(
-        id: item.id,
-        image: image,
-        isSymbol: isSymbol,
-        accessibilityLabel: item.accessibilityLabel
+  ) -> Renderable {
+    switch slot {
+    case .reaction(let reaction):
+      return renderable(for: reaction, renderMode: renderMode)
+    case .custom(let emoji):
+      return customRenderable(emoji: emoji)
+    case .another(let appearance):
+      return anotherReactionRenderable(
+        appearance: appearance, renderMode: renderMode
       )
     }
+  }
+
+  private static func renderable(
+    for reaction: Reaction,
+    renderMode: ReactionRenderMode
+  ) -> Renderable {
+    var image: UIImage?
+    var isSymbol = false
+
+    if renderMode == .auto, let name = reaction.symbolIos, !name.isEmpty {
+      image = ReactionRasteriser.symbol(name)
+      isSymbol = image != nil
+    }
+
+    if image == nil {
+      image = ReactionRasteriser.emoji(reaction.emoji)
+      isSymbol = false
+    }
+
+    return Renderable(
+      id: reaction.id,
+      image: image,
+      isSymbol: isSymbol,
+      accessibilityLabel: reaction.accessibilityLabel
+    )
   }
 }

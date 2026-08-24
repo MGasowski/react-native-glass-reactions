@@ -1,14 +1,9 @@
-import { useEffect, useId, useRef, type ComponentRef } from 'react';
-import { findNodeHandle, View, type ViewProps } from 'react-native';
+import { useId, useRef, type ComponentRef } from 'react';
+import { View, type ViewProps } from 'react-native';
 import {
-  anotherReactionKey,
-  toNativeAnotherReaction,
-} from './another-reaction';
-import { host } from './host';
-import {
-  addTriggerListener,
-  removeTriggerListener,
-} from './reactions-picker-host';
+  useTriggerRegistration,
+  type TriggerListeners,
+} from './trigger-registration';
 import type {
   AnotherReactionAppearance,
   ReactionId,
@@ -75,85 +70,33 @@ export function ReactionTrigger({
 }: ReactionTriggerProps) {
   const triggerId = useId();
   const viewRef = useRef<ComponentRef<typeof View>>(null);
-  const registeredRef = useRef(false);
 
   // Held in a ref so the native registration never has to be redone just
   // because a callback identity changed between renders.
-  const handlersRef = useRef({ onSelect, onSelectAnother, onOpen, onClose });
-  handlersRef.current = { onSelect, onSelectAnother, onOpen, onClose };
+  const listenersRef = useRef<TriggerListeners>({
+    onSelect,
+    onSelectAnother,
+    onOpen,
+    onClose,
+  });
+  listenersRef.current = { onSelect, onSelectAnother, onOpen, onClose };
 
-  // Without a handler there is nothing for a picked emoji to reach, so the
-  // plus is forced off rather than rendered inert. Otherwise the explicit prop
-  // wins, and `undefined` defers to the host's global setting.
-  const anotherReaction =
-    onSelectAnother == null ? false : anotherReactionEnabled;
-
-  const nativeAppearance = toNativeAnotherReaction(anotherReactionAppearance);
-  const appearanceKey = anotherReactionKey(anotherReactionAppearance);
-
-  const nativeItems = items.map((item) => ({
-    id: item.id,
-    emoji: item.emoji,
-    symbolIos: item.symbol?.ios,
-    symbolAndroid: item.symbol?.android,
-    accessibilityLabel: item.accessibilityLabel,
-  }));
-
-  useEffect(() => {
-    if (disabled) return;
-
-    const tag = findNodeHandle(viewRef.current);
-    if (tag == null) return;
-
-    addTriggerListener(triggerId, {
-      onSelect: (id) => handlersRef.current.onSelect(id),
-      onSelectAnother: (emoji) => handlersRef.current.onSelectAnother?.(emoji),
-      onOpen: () => handlersRef.current.onOpen?.(),
-      onClose: () => handlersRef.current.onClose?.(),
-    });
-    host.registerTrigger(
-      triggerId,
-      tag,
-      nativeItems,
-      selected,
-      anotherReaction,
-      anotherSelected,
-      nativeAppearance
-    );
-    registeredRef.current = true;
-
-    return () => {
-      registeredRef.current = false;
-      removeTriggerListener(triggerId);
-      host.unregisterTrigger(triggerId);
-    };
-    // Registration depends on identity and enablement only; item and selection
-    // changes are pushed through updateTrigger below rather than by
-    // re-registering.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerId, disabled]);
-
-  const nativeItemsKey = JSON.stringify(nativeItems);
-
-  useEffect(() => {
-    if (!registeredRef.current) return;
-    host.updateTrigger(
-      triggerId,
-      nativeItems,
-      selected,
-      anotherReaction,
-      anotherSelected,
-      nativeAppearance
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
+  useTriggerRegistration(
     triggerId,
-    selected,
-    anotherReaction,
-    anotherSelected,
-    nativeItemsKey,
-    appearanceKey,
-  ]);
+    viewRef,
+    {
+      items,
+      selected,
+      // Without a handler there is nothing for a picked emoji to reach, so the
+      // plus is forced off rather than rendered inert. Otherwise the explicit
+      // prop wins, and `undefined` defers to the host's global setting.
+      anotherReaction: onSelectAnother == null ? false : anotherReactionEnabled,
+      anotherSelected,
+      anotherReactionAppearance,
+    },
+    listenersRef,
+    disabled
+  );
 
   return (
     <View ref={viewRef} collapsable={false} {...viewProps}>

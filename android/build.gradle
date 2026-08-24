@@ -116,4 +116,8 @@ dependencies {
   // item. Android has no system-provided picker dialog; this androidx view is
   // the sanctioned equivalent.
   implementation "androidx.emoji2:emoji2-emojipicker:1.5.0"
+
+  // The interaction policy holds no framework types, so it runs as a plain JVM
+  // test — no emulator, no Robolectric. See PickerInteraction.kt.
+  testImplementation "junit:junit:4.13.2"
 }

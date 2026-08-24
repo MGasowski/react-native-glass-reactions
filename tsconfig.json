@@ -4,6 +4,10 @@
     "paths": {
       "react-native-glass-reactions": ["./src/index"]
     },
+    // The `node --test` suites import source directly, and Node's ESM
+    // resolution requires a real extension. Safe here because `noEmit` is on —
+    // bob does the building, so no `.ts` specifier ever reaches output.
+    "allowImportingTsExtensions": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "customConditions": [
@@ -24,6 +28,10 @@
     "noUnusedParameters": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
+    // Node's own globals, for the `node --test` suites. Listed explicitly
+    // because automatic @types discovery does not reach them under this
+    // resolution mode.
+    "types": ["node"],
     "strict": true,
     "target": "ESNext",
     "verbatimModuleSyntax": true

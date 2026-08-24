@@ -16,6 +16,8 @@ namespace GlassReactions { class HybridReactionsHostSpec_cxx; }
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 // Forward declaration of `NativeAnotherReaction` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeAnotherReaction; }
+// Forward declaration of `NativeTriggerPayload` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeTriggerPayload; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 
@@ -23,6 +25,7 @@ namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
 #include "NativeAnotherReaction.hpp"
 #include <optional>
 #include <string>
+#include "NativeTriggerPayload.hpp"
 #include "NativeReactionItem.hpp"
 #include <vector>
 #include <functional>
@@ -91,14 +94,8 @@ namespace margelo::nitro::glassreactions {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void registerTrigger(const std::string& triggerId, double viewTag, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) override {
-      auto __result = _swiftPart.registerTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), items, selectedId, anotherReaction, anotherSelected, anotherReactionAppearance);
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-    }
-    inline void updateTrigger(const std::string& triggerId, const std::vector<NativeReactionItem>& items, const std::optional<std::string>& selectedId, std::optional<bool> anotherReaction, const std::optional<std::string>& anotherSelected, const std::optional<NativeAnotherReaction>& anotherReactionAppearance) override {
-      auto __result = _swiftPart.updateTrigger(triggerId, items, selectedId, anotherReaction, anotherSelected, anotherReactionAppearance);
+    inline void syncTrigger(const std::string& triggerId, double viewTag, const NativeTriggerPayload& payload) override {
+      auto __result = _swiftPart.syncTrigger(triggerId, std::forward<decltype(viewTag)>(viewTag), std::forward<decltype(payload)>(payload));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

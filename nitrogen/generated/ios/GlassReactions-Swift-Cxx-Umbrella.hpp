@@ -14,6 +14,8 @@ namespace margelo::nitro::glassreactions { class HybridReactionsHostSpec; }
 namespace margelo::nitro::glassreactions { struct NativeAnotherReaction; }
 // Forward declaration of `NativeReactionItem` to properly resolve imports.
 namespace margelo::nitro::glassreactions { struct NativeReactionItem; }
+// Forward declaration of `NativeTriggerPayload` to properly resolve imports.
+namespace margelo::nitro::glassreactions { struct NativeTriggerPayload; }
 // Forward declaration of `ReactionRenderMode` to properly resolve imports.
 namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 
@@ -21,6 +23,7 @@ namespace margelo::nitro::glassreactions { enum class ReactionRenderMode; }
 #include "HybridReactionsHostSpec.hpp"
 #include "NativeAnotherReaction.hpp"
 #include "NativeReactionItem.hpp"
+#include "NativeTriggerPayload.hpp"
 #include "ReactionRenderMode.hpp"
 #include <NitroModules/Result.hpp>
 #include <exception>

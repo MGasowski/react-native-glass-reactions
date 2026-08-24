@@ -41,11 +41,7 @@ abstract class HybridReactionsHostSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun registerTrigger(triggerId: String, viewTag: Double, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?): Unit
-  
-  @DoNotStrip
-  @Keep
-  abstract fun updateTrigger(triggerId: String, items: Array<NativeReactionItem>, selectedId: String?, anotherReaction: Boolean?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?): Unit
+  abstract fun syncTrigger(triggerId: String, viewTag: Double, payload: NativeTriggerPayload): Unit
   
   @DoNotStrip
   @Keep

@@ -15,8 +15,7 @@ public protocol HybridReactionsHostSpec_protocol: HybridObject {
   // Methods
   func activate(renderMode: ReactionRenderMode, longPressDurationMs: Double, anotherReactionEnabled: Bool, anotherReactionAppearance: NativeAnotherReaction?) throws -> Void
   func deactivate() throws -> Void
-  func registerTrigger(triggerId: String, viewTag: Double, items: [NativeReactionItem], selectedId: String?, anotherReaction: Bool?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?) throws -> Void
-  func updateTrigger(triggerId: String, items: [NativeReactionItem], selectedId: String?, anotherReaction: Bool?, anotherSelected: String?, anotherReactionAppearance: NativeAnotherReaction?) throws -> Void
+  func syncTrigger(triggerId: String, viewTag: Double, payload: NativeTriggerPayload) throws -> Void
   func unregisterTrigger(triggerId: String) throws -> Void
   func setOnSelect(callback: @escaping (_ triggerId: String, _ reactionId: String?) -> Void) throws -> Void
   func setOnSelectAnother(callback: @escaping (_ triggerId: String, _ emoji: String) -> Void) throws -> Void
