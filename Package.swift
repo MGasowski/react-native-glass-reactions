@@ -28,7 +28,10 @@ let package = Package(
     .target(
       name: "PickerInteraction",
       path: "ios",
-      sources: ["PickerInteraction.swift", "ReactionResolution.swift", "PickerLayout.swift"]
+      sources: [
+        "PickerInteraction.swift", "ReactionResolution.swift", "PickerLayout.swift",
+        "SlotLayout.swift",
+      ]
     ),
     .testTarget(
       name: "PickerInteractionTests",

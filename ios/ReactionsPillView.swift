@@ -153,33 +153,27 @@ final class ReactionsPillView: UIView, SlotGeometry {
 
   // MARK: Slot geometry
 
-  /// Centre of slot `index` in the pill's own coordinates. Single source of
-  /// truth for layout, hit-testing, and the selection flight vector — slots
-  /// are not uniform once the separator inserts its extra width.
+  /// Centre of slot `index` in the pill's own coordinates. Delegates to
+  /// `SlotLayout`, which both this and `slotIndex(atLocalX:)` below call into
+  /// — the single source of truth for layout, hit-testing, and the selection
+  /// flight vector — slots are not uniform once the separator inserts its
+  /// extra width.
   func slotCenterX(at index: Int) -> CGFloat {
-    var x = Metrics.contentInset
-      + CGFloat(index) * (Metrics.itemSize + Metrics.itemSpacing)
-      + Metrics.itemSize / 2
-    if let separatorAfter, index >= separatorAfter {
-      x += Metrics.separatorExtra
-    }
-    return x
+    SlotLayout.centerX(
+      at: index, itemSize: Metrics.itemSize, itemSpacing: Metrics.itemSpacing,
+      contentInset: Metrics.contentInset, separatorAfter: separatorAfter,
+      separatorExtra: Metrics.separatorExtra
+    )
   }
 
   /// The slot nearest the given local x, clamped to the row. The host has
   /// already checked the point is inside the pill's (tolerance-inset) frame.
   func slotIndex(atLocalX x: CGFloat) -> Int? {
-    guard !renderables.isEmpty else { return nil }
-    var best = 0
-    var bestDistance = CGFloat.greatestFiniteMagnitude
-    for index in renderables.indices {
-      let distance = abs(x - slotCenterX(at: index))
-      if distance < bestDistance {
-        best = index
-        bestDistance = distance
-      }
-    }
-    return best
+    SlotLayout.nearestIndex(
+      atLocalX: x, count: renderables.count, itemSize: Metrics.itemSize,
+      itemSpacing: Metrics.itemSpacing, contentInset: Metrics.contentInset,
+      separatorAfter: separatorAfter, separatorExtra: Metrics.separatorExtra
+    )
   }
 
   /// The capsule behind the reactions — a glass container on iOS 26, a blur
