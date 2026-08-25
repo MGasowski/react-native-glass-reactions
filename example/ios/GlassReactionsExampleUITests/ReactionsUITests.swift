@@ -114,4 +114,52 @@ final class ReactionsUITests: XCTestCase {
 
     scrollHard()
   }
+
+  /// Not an assertion: a driver.
+  ///
+  /// `simctl` and Maestro both press and release as one event, so neither can
+  /// hold the picker open long enough to film it. This performs the real
+  /// gesture slowly enough to record against, for the capture screen
+  /// (`SCREEN = "demo"`). Run it with `simctl io recordVideo` in flight.
+  ///
+  /// It also serves as the only way to see the pill's resolved colours at all,
+  /// which is what the surface-appearance work needed.
+  func testCaptureDemoGesture() throws {
+    // The shared setUp launches without arguments, which points the bundle at
+    // 8081. Relaunch onto whichever port Metro is actually on.
+    app.terminate()
+    app.launchArguments += ["-RCT_jsLocation", "localhost:8082"]
+    app.launch()
+
+    let card = app.otherElements.matching(identifier: "card-2").firstMatch
+    XCTAssertTrue(
+      card.waitForExistence(timeout: 60),
+      "demo card not found — is SCREEN set to 'demo' in demo-config.ts?"
+    )
+
+    // Starts low in the card and finishes up over the pill, crossing several
+    // reactions on the way so the focus animation is in shot. `.slow` keeps
+    // the traverse legible at 24fps.
+    // card-2 rather than the first card: the pill opens *above* its trigger,
+    // and above card-0 is the status bar. Two cards down puts it mid-screen.
+    let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.20, dy: 0.60))
+    let destination = card.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: -0.10))
+
+    let badge = app.otherElements.matching(identifier: "badge-2").firstMatch
+    XCTAssertTrue(badge.waitForExistence(timeout: 10))
+
+    start.press(
+      forDuration: 1.2,
+      thenDragTo: destination,
+      withVelocity: .slow,
+      thenHoldForDuration: 1.2
+    )
+
+    // Without this the capture silently "passes" when the pan wins
+    // arbitration and the list merely scrolls, which is what the taller card
+    // geometry caused once already.
+    let committed = NSPredicate(format: "label != %@", "none")
+    expectation(for: committed, evaluatedWith: badge)
+    waitForExpectations(timeout: 10)
+  }
 }
