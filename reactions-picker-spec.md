@@ -95,6 +95,7 @@ type ReactionId = string;
 interface ReactionSymbol {
   readonly ios: string;              // SF Symbol name, e.g. 'flame.fill'
   readonly android?: string;         // Material Symbol name; omit to use emoji on Android
+  readonly color?: string;           // hex or 'multicolor'; iOS only in 1.x
 }
 
 interface ReactionItem {
@@ -136,7 +137,9 @@ Resolution order per item under `renderMode: 'auto'`:
 
 **Android does not get SF Symbols.** The SF Symbols set is licensed for Apple platforms and its font cannot be shipped in an Android artifact; `symbol.android` therefore names a *Material Symbol*, a different set with different names. Consumers who want symbols on both platforms configure both, and consumers who omit `symbol.android` get emoji on Android with no extra work. This is the reason `symbol` is a record with per-platform fields rather than a single string.
 
-Symbols are monochrome and take a tint, where emoji carry their own color. The picker therefore owns a small tint treatment for symbol rendering (default and selected states); this is the one piece of appearance the library owns, and it is deliberately not consumer-themable in 1.0.
+Symbols are monochrome and take a tint, where emoji carry their own color. The picker therefore owns a small tint treatment for symbol rendering (default and selected states); this is the one piece of appearance the library owns.
+
+**Amended in 0.3:** that treatment is now overridable per item, through `symbol.color` — a hex string or the keyword `'multicolor'`, honoured on iOS and ignored on Android, which renders emoji only. `'multicolor'` asks SF Symbols for the glyph's own palette instead of a chosen colour; a symbol with no multicolor variant renders monochrome rather than falling through to the emoji, since the named glyph is the request and its palette only the preference. It applies to a reaction's own symbol only: the "another reaction" glyph is composited with its badge into one bitmap, where a palette would be baked in — along with the monochrome fallback of a symbol that has none — freezing a colour that must track the surface the pill lands on. Either form keeps its colours in both states rather than tinting on selection: selection *is* the tint, and tinting over a supplied color would discard it, so a colored symbol behaves exactly as an emoji already does. The default remains the library's own treatment; nothing about it changes for items that supply no color.
 
 Exports:
 

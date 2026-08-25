@@ -20,7 +20,7 @@ const items = [
   {
     id: 'love',
     emoji: '❤️',
-    symbol: { ios: 'heart.fill', android: 'favorite' },
+    symbol: { ios: 'heart.fill', android: 'favorite', color: '#FF6B6B' },
     accessibilityLabel: 'Love',
   },
 ];
@@ -35,10 +35,12 @@ describe('triggerPayload', () => {
       emoji: '👍',
       symbolIos: undefined,
       symbolAndroid: undefined,
+      symbolColor: undefined,
       accessibilityLabel: 'Thumbs up',
     });
     assert.equal(payload.items[1]?.symbolIos, 'heart.fill');
     assert.equal(payload.items[1]?.symbolAndroid, 'favorite');
+    assert.equal(payload.items[1]?.symbolColor, '#FF6B6B');
   });
 
   it('carries the selection and the another-reaction fields', () => {
@@ -199,6 +201,21 @@ describe('isSameTriggerPayload', () => {
       ),
       true
     );
+  });
+
+  /**
+   * A recolour changes nothing else about an item, so it is exactly the kind
+   * of difference a field-by-field comparison can drop by omission.
+   */
+  it('notices a symbol recolour', () => {
+    const recoloured = triggerPayload({
+      ...content,
+      items: [
+        items[0]!,
+        { ...items[1]!, symbol: { ...items[1]!.symbol!, color: '#4C8DFF' } },
+      ],
+    });
+    assert.equal(isSameTriggerPayload(triggerPayload(content), recoloured), false);
   });
 
   /** Short-circuiting must not make a later difference invisible. */

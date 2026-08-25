@@ -25,6 +25,8 @@ export interface NativeReactionItem {
   symbolIos?: string;
   /** Material Symbol name, Android only. */
   symbolAndroid?: string;
+  /** `#RGB` / `#RRGGBB` / `#RRGGBBAA` colour for the symbol. */
+  symbolColor?: string;
   accessibilityLabel: string;
 }
 
@@ -38,6 +40,8 @@ export interface NativeAnotherReaction {
   symbolIos?: string;
   /** Material Symbol name, Android only — unused in 1.x (emoji-only there). */
   symbolAndroid?: string;
+  /** `#RGB` / `#RRGGBB` / `#RRGGBBAA` colour for the glyph and its badge. */
+  symbolColor?: string;
   /** Fallback when no symbol renders, and the forced form under `emoji` mode. */
   emoji?: string;
   /** The corner plus badge. Default true. Only drawn over a symbol. */

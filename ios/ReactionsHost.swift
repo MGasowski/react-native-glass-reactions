@@ -292,13 +292,11 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       disabledScrollView = scrollView
     }
 
-    // The pill matches the surface it floats over, not the system theme —
-    // materials, symbol tints, and the divider all resolve through this trait.
-    picker.overrideUserInterfaceStyle =
-      SurfaceAppearance.isDark(under: triggerView) ? .dark : .light
-
     // Drawn from the very list that will be hit-tested, in the same order, so
     // the row on screen and the row the rules reason about cannot disagree.
+    // This runs before the surface trait is chosen because the trait depends
+    // on where the pill lands, and where it lands depends on how wide its
+    // content makes it.
     picker.apply(
       items: slots.map {
         ReactionResolver.renderable(for: $0, renderMode: renderMode)
@@ -326,6 +324,13 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // bug where every pill came out ~16% wider than its content, items packed
     // left with dead space on the right. The center accounts for the (0.5, 1)
     // anchor prepareForPresentation sets.
+    // The pill matches the surface it floats over, not the system theme —
+    // materials, symbol tints, and the divider all resolve through this trait.
+    // Sampled against `pickerFrame`, the area the pill is about to cover.
+    picker.overrideUserInterfaceStyle =
+      SurfaceAppearance.isDark(in: pickerFrame, relativeTo: triggerView)
+      ? .dark : .light
+
     picker.prepareForPresentation()
     picker.bounds = CGRect(origin: .zero, size: pickerFrame.size)
     picker.center = CGPoint(x: pickerFrame.midX, y: pickerFrame.maxY)
@@ -336,6 +341,11 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     if picker.superview == nil {
       overlay.rootViewController?.view.addSubview(picker)
     }
+    // Resolve the new trait before the pill is ever composited. Without this
+    // the first frame is drawn with the previously resolved colours and the
+    // material, and the correct ones arrive a frame or two later — which read
+    // as the pill opening dark and then washing to light.
+    picker.layoutIfNeeded()
     picker.isHidden = false
     picker.animateIn()
 
@@ -376,6 +386,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
           emoji: item.emoji,
           symbolIos: item.symbolIos,
           symbolAndroid: item.symbolAndroid,
+          symbolColor: item.symbolColor,
           accessibilityLabel: item.accessibilityLabel
         )
       )
@@ -404,6 +415,7 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     return AnotherReactionAppearance(
       symbolIos: native.symbolIos,
       symbolAndroid: native.symbolAndroid,
+      symbolColor: native.symbolColor,
       emoji: native.emoji,
       badge: native.badge,
       accessibilityLabel: native.accessibilityLabel

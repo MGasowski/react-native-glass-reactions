@@ -40,6 +40,8 @@ namespace margelo::nitro::glassreactions {
       jni::local_ref<jni::JString> symbolIos = this->getFieldValue(fieldSymbolIos);
       static const auto fieldSymbolAndroid = clazz->getField<jni::JString>("symbolAndroid");
       jni::local_ref<jni::JString> symbolAndroid = this->getFieldValue(fieldSymbolAndroid);
+      static const auto fieldSymbolColor = clazz->getField<jni::JString>("symbolColor");
+      jni::local_ref<jni::JString> symbolColor = this->getFieldValue(fieldSymbolColor);
       static const auto fieldAccessibilityLabel = clazz->getField<jni::JString>("accessibilityLabel");
       jni::local_ref<jni::JString> accessibilityLabel = this->getFieldValue(fieldAccessibilityLabel);
       return NativeReactionItem(
@@ -47,6 +49,7 @@ namespace margelo::nitro::glassreactions {
         emoji->toStdString(),
         symbolIos != nullptr ? std::make_optional(symbolIos->toStdString()) : std::nullopt,
         symbolAndroid != nullptr ? std::make_optional(symbolAndroid->toStdString()) : std::nullopt,
+        symbolColor != nullptr ? std::make_optional(symbolColor->toStdString()) : std::nullopt,
         accessibilityLabel->toStdString()
       );
     }
@@ -57,7 +60,7 @@ namespace margelo::nitro::glassreactions {
      */
     [[maybe_unused]]
     static jni::local_ref<JNativeReactionItem::javaobject> fromCpp(const NativeReactionItem& value) {
-      using JSignature = JNativeReactionItem(jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>);
+      using JSignature = JNativeReactionItem(jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -66,6 +69,7 @@ namespace margelo::nitro::glassreactions {
         jni::make_jstring(value.emoji),
         value.symbolIos.has_value() ? jni::make_jstring(value.symbolIos.value()) : nullptr,
         value.symbolAndroid.has_value() ? jni::make_jstring(value.symbolAndroid.value()) : nullptr,
+        value.symbolColor.has_value() ? jni::make_jstring(value.symbolColor.value()) : nullptr,
         jni::make_jstring(value.accessibilityLabel)
       );
     }

@@ -36,6 +36,8 @@ namespace margelo::nitro::glassreactions {
       jni::local_ref<jni::JString> symbolIos = this->getFieldValue(fieldSymbolIos);
       static const auto fieldSymbolAndroid = clazz->getField<jni::JString>("symbolAndroid");
       jni::local_ref<jni::JString> symbolAndroid = this->getFieldValue(fieldSymbolAndroid);
+      static const auto fieldSymbolColor = clazz->getField<jni::JString>("symbolColor");
+      jni::local_ref<jni::JString> symbolColor = this->getFieldValue(fieldSymbolColor);
       static const auto fieldEmoji = clazz->getField<jni::JString>("emoji");
       jni::local_ref<jni::JString> emoji = this->getFieldValue(fieldEmoji);
       static const auto fieldBadge = clazz->getField<jni::JBoolean>("badge");
@@ -45,6 +47,7 @@ namespace margelo::nitro::glassreactions {
       return NativeAnotherReaction(
         symbolIos != nullptr ? std::make_optional(symbolIos->toStdString()) : std::nullopt,
         symbolAndroid != nullptr ? std::make_optional(symbolAndroid->toStdString()) : std::nullopt,
+        symbolColor != nullptr ? std::make_optional(symbolColor->toStdString()) : std::nullopt,
         emoji != nullptr ? std::make_optional(emoji->toStdString()) : std::nullopt,
         badge != nullptr ? std::make_optional(static_cast<bool>(badge->value())) : std::nullopt,
         accessibilityLabel != nullptr ? std::make_optional(accessibilityLabel->toStdString()) : std::nullopt
@@ -57,13 +60,14 @@ namespace margelo::nitro::glassreactions {
      */
     [[maybe_unused]]
     static jni::local_ref<JNativeAnotherReaction::javaobject> fromCpp(const NativeAnotherReaction& value) {
-      using JSignature = JNativeAnotherReaction(jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JString>);
+      using JSignature = JNativeAnotherReaction(jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
         value.symbolIos.has_value() ? jni::make_jstring(value.symbolIos.value()) : nullptr,
         value.symbolAndroid.has_value() ? jni::make_jstring(value.symbolAndroid.value()) : nullptr,
+        value.symbolColor.has_value() ? jni::make_jstring(value.symbolColor.value()) : nullptr,
         value.emoji.has_value() ? jni::make_jstring(value.emoji.value()) : nullptr,
         value.badge.has_value() ? jni::JBoolean::valueOf(value.badge.value()) : nullptr,
         value.accessibilityLabel.has_value() ? jni::make_jstring(value.accessibilityLabel.value()) : nullptr

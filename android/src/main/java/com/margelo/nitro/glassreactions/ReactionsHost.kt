@@ -11,6 +11,7 @@ import android.view.ViewConfiguration
 import android.view.Window
 import android.widget.FrameLayout
 import com.facebook.proguard.annotations.DoNotStrip
+import com.facebook.react.bridge.LifecycleEventListener
 import com.margelo.nitro.NitroModules
 import kotlin.math.abs
 
@@ -71,6 +72,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     private var overlay: FrameLayout? = null
 
     private var originalCallback: Window.Callback? = null
+    private var lifecycleListener: LifecycleEventListener? = null
     private var wrappedActivity: Activity? = null
 
     // Active interaction
@@ -123,6 +125,10 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             wrappedActivity?.window?.callback = originalCallback
             originalCallback = null
             wrappedActivity = null
+            lifecycleListener?.let {
+                NitroModules.applicationContext?.removeLifecycleEventListener(it)
+            }
+            lifecycleListener = null
             overlay?.let { (it.parent as? ViewGroup)?.removeView(it) }
             overlay = null
             picker = null
@@ -192,10 +198,44 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
      * `dispatchTouchEvent`. One interception point for the whole app; nothing
      * per row (spec §6.5).
      */
+    /**
+     * Installs on the next host resume if there is no Activity yet.
+     *
+     * `activate` runs when the JS host mounts, which is not ordered against the
+     * Activity being current: on a cold start, and reliably after a bundle
+     * reload, `currentActivity` is still null when the posted `install` runs.
+     * The old code returned there and nothing retried, so the window callback
+     * was never wrapped and no long-press could ever open the picker for the
+     * rest of the process. It failed silently — no crash, no log, just a
+     * picker that never appeared.
+     *
+     * Registered once and left in place: `install` is idempotent, and a resume
+     * is also the moment a *new* Activity would need wrapping.
+     */
+    private fun installOnNextResume() {
+        if (lifecycleListener != null) return
+        val context = NitroModules.applicationContext ?: return
+        val listener = object : LifecycleEventListener {
+            override fun onHostResume() = install()
+            override fun onHostPause() = Unit
+            override fun onHostDestroy() = Unit
+        }
+        lifecycleListener = listener
+        context.addLifecycleEventListener(listener)
+    }
+
     private fun install() {
         if (originalCallback != null) return
-        val activity = currentActivity() ?: return
-        val window = activity.window ?: return
+        val activity = currentActivity()
+        if (activity == null) {
+            installOnNextResume()
+            return
+        }
+        val window = activity.window
+        if (window == null) {
+            installOnNextResume()
+            return
+        }
 
         touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
         focusTolerancePx = (12 * activity.resources.displayMetrics.density).toInt()
@@ -436,6 +476,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
                     emoji = it.emoji,
                     symbolIos = it.symbolIos,
                     symbolAndroid = it.symbolAndroid,
+                    symbolColor = it.symbolColor,
                     accessibilityLabel = it.accessibilityLabel
                 )
             )
@@ -465,6 +506,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             AnotherReactionAppearance(
                 symbolIos = it.symbolIos,
                 symbolAndroid = it.symbolAndroid,
+                symbolColor = it.symbolColor,
                 emoji = it.emoji,
                 badge = it.badge,
                 accessibilityLabel = it.accessibilityLabel

@@ -14,6 +14,9 @@ struct Reaction: Equatable {
   let emoji: String
   let symbolIos: String?
   let symbolAndroid: String?
+  /// Hex colour for the symbol, unparsed — the pill decides what an
+  /// unrecognised string means, and it means "no colour" there.
+  let symbolColor: String?
   let accessibilityLabel: String
 
   init(
@@ -21,12 +24,14 @@ struct Reaction: Equatable {
     emoji: String,
     symbolIos: String? = nil,
     symbolAndroid: String? = nil,
+    symbolColor: String? = nil,
     accessibilityLabel: String
   ) {
     self.id = id
     self.emoji = emoji
     self.symbolIos = symbolIos
     self.symbolAndroid = symbolAndroid
+    self.symbolColor = symbolColor
     self.accessibilityLabel = accessibilityLabel
   }
 }
@@ -37,6 +42,9 @@ struct Reaction: Equatable {
 struct AnotherReactionAppearance: Equatable {
   let symbolIos: String?
   let symbolAndroid: String?
+  /// Colours the whole item, badge included: glyph and badge are one template
+  /// image, so they cannot take different colours.
+  let symbolColor: String?
   let emoji: String?
   let badge: Bool?
   let accessibilityLabel: String?
@@ -44,12 +52,14 @@ struct AnotherReactionAppearance: Equatable {
   init(
     symbolIos: String? = nil,
     symbolAndroid: String? = nil,
+    symbolColor: String? = nil,
     emoji: String? = nil,
     badge: Bool? = nil,
     accessibilityLabel: String? = nil
   ) {
     self.symbolIos = symbolIos
     self.symbolAndroid = symbolAndroid
+    self.symbolColor = symbolColor
     self.emoji = emoji
     self.badge = badge
     self.accessibilityLabel = accessibilityLabel

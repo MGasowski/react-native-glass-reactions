@@ -17,6 +17,11 @@ data class Reaction(
     val emoji: String,
     val symbolIos: String? = null,
     val symbolAndroid: String? = null,
+    /**
+     * Hex colour for the symbol. Carried for parity with iOS and unused in
+     * 1.x, where Android renders emoji only and so has no symbol to colour.
+     */
+    val symbolColor: String? = null,
     val accessibilityLabel: String
 )
 
@@ -28,6 +33,8 @@ data class Reaction(
 data class AnotherReactionAppearance(
     val symbolIos: String? = null,
     val symbolAndroid: String? = null,
+    /** Carried for parity with iOS; unused while Android renders emoji only. */
+    val symbolColor: String? = null,
     val emoji: String? = null,
     val badge: Boolean? = null,
     val accessibilityLabel: String? = null

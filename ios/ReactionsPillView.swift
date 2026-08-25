@@ -76,11 +76,15 @@ enum GlassSupport {
 /// all), so the trigger's on-screen region is sampled directly. One tiny
 /// render per open, at gesture-begin — never on the scroll or focus path.
 enum SurfaceAppearance {
-  static func isDark(under view: UIView) -> Bool {
+  /// `rect` is in the coordinate space of `view`'s window, and is the area the
+  /// pill will actually occupy — not the trigger's own frame. PickerLayout
+  /// places the pill *above* its trigger, so the trigger's pixels answer the
+  /// wrong question: a dark row sitting under a light page resolved `.dark`
+  /// and put white symbols on white.
+  static func isDark(in rect: CGRect, relativeTo view: UIView) -> Bool {
     let fallback = view.traitCollection.userInterfaceStyle == .dark
     guard let window = view.window else { return fallback }
-    let rect = view.convert(view.bounds, to: window)
-      .intersection(window.bounds)
+    let rect = rect.intersection(window.bounds)
     guard !rect.isEmpty, rect.width >= 1, rect.height >= 1 else { return fallback }
 
     // The whole trigger area squashed into a handful of pixels: the average
@@ -124,12 +128,35 @@ enum SurfaceAppearance {
 
 // MARK: - Renderable
 
+/// How a drawn slot takes colour.
+///
+/// Three cases rather than a `UIColor?`, because the rule that matters — only
+/// a `.system` symbol changes colour when it becomes the selected reaction —
+/// is then a case split rather than a nil check whose meaning has to be
+/// remembered. `.own` covers both emoji, which carry colour in their glyphs,
+/// and a symbol the consumer coloured: in both, the colour on screen is the
+/// one that was asked for, and selection must not overwrite it.
+enum SymbolTint: Equatable {
+  /// The image brings its own colour. Never tinted, never re-tinted.
+  case own
+  /// A monochrome symbol: `.label` normally, `.tintColor` when selected.
+  case system
+  /// A symbol drawn from its own palette. Tinted `.label` like a plain symbol
+  /// — a multicolor image is not a template, so only the layers Apple marked
+  /// as accent take that colour and the rest keep theirs — but never re-tinted
+  /// on selection, which would recolour those accent layers alone and leave
+  /// the glyph half-selected.
+  case multicolor
+  /// A monochrome symbol the consumer gave a colour. Held through selection.
+  case custom(UIColor)
+}
+
 /// A reaction resolved down to what actually gets drawn. Resolution happens
 /// once per prop change; layout and drawing never re-resolve.
 struct Renderable {
   let id: String
   let image: UIImage?
-  let isSymbol: Bool
+  let tint: SymbolTint
   let accessibilityLabel: String
 }
 
@@ -263,8 +290,10 @@ final class ReactionsPillView: UIView, SlotGeometry {
       // Rasterised at max size and scaled down, never up (spec §6.5).
       imageView.layer.minificationFilter = .trilinear
       imageView.image = renderable.image
-      if renderable.isSymbol {
-        imageView.tintColor = .label
+      switch renderable.tint {
+      case .own: break
+      case .system, .multicolor: imageView.tintColor = .label
+      case .custom(let color): imageView.tintColor = color
       }
 
       imageView.isAccessibilityElement = true
@@ -275,7 +304,14 @@ final class ReactionsPillView: UIView, SlotGeometry {
       imageViews.append(imageView)
     }
 
-    separatorView.backgroundColor = UIColor.label.withAlphaComponent(0.25)
+    // A dynamic provider, not `UIColor.label.withAlphaComponent(0.25)`:
+    // withAlphaComponent resolves the dynamic colour against whatever traits
+    // are current when it is called and returns a *static* colour. Items are
+    // built before the surface trait is known, so the frozen value was always
+    // the system theme's and never followed the pill.
+    separatorView.backgroundColor = UIColor { trait in
+      UIColor.label.resolvedColor(with: trait).withAlphaComponent(0.25)
+    }
     separatorView.isHidden = separatorAfter == nil
     addSubview(separatorView)
   }
@@ -573,9 +609,10 @@ final class ReactionsPillView: UIView, SlotGeometry {
 
   private func applySelection(_ selectedId: String?) {
     // Symbols are monochrome and carry no colour of their own, so selection is
-    // expressed as a tint. Emoji bring their own colour and are left alone.
-    // See spec §5.
-    for (index, renderable) in renderables.enumerated() where renderable.isSymbol {
+    // expressed as a tint. Emoji bring their own colour and are left alone —
+    // and so is a symbol the consumer coloured, for the same reason: tinting
+    // over a supplied colour would throw that colour away. See spec §5.
+    for (index, renderable) in renderables.enumerated() where renderable.tint == .system {
       guard index < imageViews.count else { continue }
       imageViews[index].tintColor =
         renderable.id == selectedId ? .tintColor : .label
@@ -688,12 +725,29 @@ private enum ReactionRasteriser {
     }
   }
 
-  static func symbol(_ name: String) -> UIImage? {
+  /// `multicolor` asks SF Symbols for the glyph's own palette.
+  ///
+  /// The rendering mode is deliberately left alone. A multicolor symbol image
+  /// is not a template, so the colours in it survive a tint on their own —
+  /// while the layers Apple marked as *accent* still take the view's tint,
+  /// which is what makes `flame.fill` stay orange where an accent-only symbol
+  /// follows `.label`. Forcing `.alwaysOriginal` here froze that accent at
+  /// UIKit's default blue and painted the whole glyph with it.
+  ///
+  /// A symbol with no multicolor variant renders in its monochrome form rather
+  /// than failing, so this never falls through to the emoji — which is right:
+  /// the glyph the consumer named is what they asked for, and its palette was
+  /// the preference.
+  static func symbol(_ name: String, multicolor: Bool = false) -> UIImage? {
     let configuration = UIImage.SymbolConfiguration(
       pointSize: Metrics.rasterSize * 0.62,
       weight: .semibold
     )
-    return UIImage(systemName: name, withConfiguration: configuration)
+    let image = UIImage(systemName: name, withConfiguration: configuration)
+    guard multicolor else { return image }
+    return image?.applyingSymbolConfiguration(
+      UIImage.SymbolConfiguration.preferringMulticolor()
+    )
   }
 
   /// Chrome for the trailing "another reaction" item: by default a dashed
@@ -705,6 +759,13 @@ private enum ReactionRasteriser {
   /// (`face.dashed` is iOS 16+, `circle.dashed` covers 15). Returns `nil` when
   /// a supplied name resolves to no symbol, which is the caller's cue to fall
   /// back to emoji.
+  ///
+  /// Takes no multicolor option. Glyph and badge are composited into one
+  /// bitmap, so any palette would be *baked* — and a symbol without a
+  /// multicolor variant would bake its monochrome fallback too, freezing a
+  /// colour that must track the surface the pill lands on. A hex colour is
+  /// safe here because the composite stays a tintable template; a palette is
+  /// not, so `'multicolor'` leaves this item on its default treatment.
   static func anotherReaction(symbolName: String? = nil, badge: Bool = true) -> UIImage? {
     let side = Metrics.rasterSize
 
@@ -745,6 +806,8 @@ private enum ReactionRasteriser {
         width: faceSize,
         height: faceSize
       )
+      // Drawn black-on-template so the whole tile comes out as one tintable
+      // mask, whatever colour it is eventually asked to take.
       face?.withTintColor(.black, renderingMode: .alwaysTemplate).draw(in: faceRect)
 
       guard badge else { return }
@@ -801,12 +864,17 @@ enum ReactionResolver {
       for: slot, renderMode: mode, symbolsSupported: true
     )
 
+    // Read once per slot rather than per candidate: what the consumer asked
+    // for does not change as the chain is walked, only whether the candidate
+    // being tried is a symbol at all.
+    let paint = SymbolPaint(symbolColor(for: slot))
+
     for candidate in order {
-      if let image = image(for: candidate) {
+      if let image = image(for: candidate, paint: paint) {
         return Renderable(
           id: id(for: slot),
           image: image,
-          isSymbol: isSymbol(candidate),
+          tint: tint(for: candidate, paint: paint),
           accessibilityLabel: label(for: slot)
         )
       }
@@ -816,29 +884,64 @@ enum ReactionResolver {
     // and `NativeReactionItem.emoji` is required, so only an empty custom pick
     // could get here. Drawing nothing is still better than force-unwrapping.
     return Renderable(
-      id: id(for: slot), image: nil, isSymbol: false, accessibilityLabel: label(for: slot)
+      id: id(for: slot), image: nil, tint: .own, accessibilityLabel: label(for: slot)
     )
   }
 
-  private static func image(for candidate: Candidate) -> UIImage? {
+  private static func image(for candidate: Candidate, paint: SymbolPaint) -> UIImage? {
     switch candidate {
     case .symbol(let name):
-      return ReactionRasteriser.symbol(name)
+      return ReactionRasteriser.symbol(name, multicolor: paint == .multicolor)
+    // No multicolor here: the ＋ item is a composite bitmap and cannot carry a
+    // palette safely. See `ReactionRasteriser.anotherReaction`.
     case .anotherSymbol(let name, let badge):
       return ReactionRasteriser.anotherReaction(symbolName: name, badge: badge)
     case .emoji(let value):
       return ReactionRasteriser.emoji(value)
+    // The built-in dashed face has no palette of its own to prefer, so asking
+    // for one changes nothing about how it draws.
     case .builtIn(let badge):
       return ReactionRasteriser.anotherReaction(badge: badge)
     }
   }
 
-  /// Whether the drawn image should be tinted like a symbol. True for every
-  /// candidate but `.emoji` — the built-in glyph is itself a template-rendered
-  /// symbol image, not content, so it tints the same way a supplied one would.
-  private static func isSymbol(_ candidate: Candidate) -> Bool {
-    if case .emoji = candidate { return false }
-    return true
+  /// How the drawn image takes colour.
+  ///
+  /// Every candidate but `.emoji` is a monochrome template image — the built-in
+  /// glyph included, since it is chrome rather than content — so all of them
+  /// tint, unless the consumer asked for the glyph's own palette, which came
+  /// out of the rasteriser already coloured and must not be tinted over.
+  ///
+  /// The paint comes off the *slot* rather than the candidate because
+  /// `Candidate` is `ReactionResolution`'s type, and that module decides the
+  /// order to try, not what the result looks like.
+  private static func tint(for candidate: Candidate, paint: SymbolPaint) -> SymbolTint {
+    if case .emoji = candidate { return .own }
+    switch paint {
+    case .default:
+      return .system
+    // Only a lone symbol is drawn from a palette; the ＋ composite ignored the
+    // request, so it must keep the treatment that goes with what was drawn.
+    case .multicolor:
+      if case .symbol = candidate { return .multicolor }
+      return .system
+    case .solid(let color):
+      return .custom(
+        UIColor(
+          red: color.red, green: color.green, blue: color.blue, alpha: color.alpha
+        )
+      )
+    }
+  }
+
+  private static func symbolColor(for slot: Slot) -> String? {
+    switch slot {
+    case .reaction(let reaction): return reaction.symbolColor
+    // A custom pick is an emoji and never draws as a symbol, so it has no
+    // colour to give.
+    case .custom: return nil
+    case .another(let appearance): return appearance?.symbolColor
+    }
   }
 
   private static func id(for slot: Slot) -> String {

@@ -28,8 +28,8 @@ On iOS 26 the picker is drawn with the system **Liquid Glass** material. On olde
 <td><img src="assets/demo-android.gif" alt="Flat translucent picker on Android" width="100%"></td>
 </tr>
 <tr>
-<td align="center"><sub>Translucent capsule — the row behind it shows through</sub></td>
-<td align="center"><sub>Opaque capsule, under Reduce Transparency</sub></td>
+<td align="center"><sub>Translucent capsule — the artwork behind it shows through</sub></td>
+<td align="center"><sub>Opaque capsule, under Reduce Transparency — same coloured symbols</sub></td>
 <td align="center"><sub>Flat translucent capsule, emoji everywhere</sub></td>
 </tr>
 </table>
@@ -71,9 +71,9 @@ import {
 } from 'react-native-glass-reactions';
 
 const REACTIONS: readonly ReactionItem[] = [
-  { id: 'like', emoji: '👍', symbol: { ios: 'hand.thumbsup.fill' }, accessibilityLabel: 'Like' },
-  { id: 'love', emoji: '❤️', symbol: { ios: 'heart.fill' }, accessibilityLabel: 'Love' },
-  { id: 'fire', emoji: '🔥', symbol: { ios: 'flame.fill' }, accessibilityLabel: 'Fire' },
+  { id: 'like', emoji: '👍', symbol: { ios: 'hand.thumbsup.fill', color: '#4C8DFF' }, accessibilityLabel: 'Like' },
+  { id: 'love', emoji: '❤️', symbol: { ios: 'heart.fill', color: '#FF6B6B' }, accessibilityLabel: 'Love' },
+  { id: 'fire', emoji: '🔥', symbol: { ios: 'flame.fill', color: '#FF6B2C' }, accessibilityLabel: 'Fire' },
 ];
 
 function App() {
@@ -113,6 +113,36 @@ Symbols and emoji are not derivable from one another — nothing can produce �
 SF Symbols are licensed for Apple platforms and cannot ship in an Android artifact, which is why `symbol` is per-platform rather than a single name. Omit `symbol.android` and you get emoji there with no extra work.
 
 Set `renderMode="emoji"` on the host to force emoji everywhere.
+
+#### Colouring symbols
+
+A symbol is a monochrome glyph, so it draws in `.label` unless you say otherwise. `symbol.color` says otherwise:
+
+```tsx
+{ id: 'love', emoji: '❤️', symbol: { ios: 'heart.fill', color: '#FF6B6B' }, accessibilityLabel: 'Love' }
+```
+
+Accepted forms are `#RGB`, `#RGBA`, `#RRGGBB` and `#RRGGBBAA`, with the `#` optional. Anything else is ignored and the symbol stays `.label` — a typo leaves you with a legible glyph rather than a colour nobody chose.
+
+There is one keyword besides a colour:
+
+```tsx
+{ id: 'fire', emoji: '🔥', symbol: { ios: 'flame.fill', color: 'multicolor' }, accessibilityLabel: 'Fire' }
+```
+
+`'multicolor'` asks SF Symbols for the palette Apple drew into the glyph itself, rather than a colour you picked. Whether a symbol *has* one is Apple's call and varies by OS version — on iOS 26, `star.fill` comes back gold while `flame.fill` has no palette at all. A symbol without one renders monochrome as usual rather than falling back to the emoji, since the glyph you named is what you asked for and its palette was only the preference. Check yours in the SF Symbols app under *Multicolor* before shipping it.
+
+Two things `'multicolor'` does not do:
+
+- **It is ignored on the ＋ item**, which composites its glyph and badge into one bitmap. A palette would be baked into that bitmap, including the monochrome fallback for a symbol that has none — freezing a colour that has to follow whatever surface the pill lands on. Hex colours work there; `'multicolor'` leaves it on the default glyph treatment.
+- **It does not force colour onto a symbol that has no palette.** That glyph keeps the library's `.label` treatment, which stays legible on light and dark surfaces alike.
+
+Two consequences worth knowing before you reach for either form:
+
+- **A coloured or multicolor symbol no longer tints on selection.** Selection is drawn as a tint, and tinting over your colour would throw it away, so it holds its colours whether or not it is the current pick — exactly as an emoji does. If the pill is the only place you show what is selected, leave the colour off.
+- **It does nothing on Android in 1.x**, which renders emoji only. The field is accepted there and ignored, like `symbol.android`.
+
+Either form applies to the glyph, not to the emoji it falls back to — an emoji already carries its own.
 
 <img src="assets/selection-model.png" alt="Selection model" width="100%">
 
@@ -156,7 +186,7 @@ The default glyph is a dashed emoji with a plus badge, and its label is the Engl
 
 | Field | Default | Notes |
 | --- | --- | --- |
-| `symbol` | dashed face (`face.dashed`, `circle.dashed` on iOS 15) | iOS only. `symbol.android` is accepted but ignored in 1.x — Android renders emoji only, exactly as it does for items. |
+| `symbol` | dashed face (`face.dashed`, `circle.dashed` on iOS 15) | iOS only. `symbol.android` is accepted but ignored in 1.x — Android renders emoji only, exactly as it does for items. `symbol.color` takes a hex colour here and applies to the item including its plus badge: the two are drawn into one image and cannot take different colours. `'multicolor'` is ignored — see [Colouring symbols](#colouring-symbols). |
 | `emoji` | — | Used when no symbol renders, and forced under `renderMode="emoji"`. The only way to change the Android glyph. |
 | `badge` | `true` | The corner plus. Only drawn over a symbol: an emoji already reads as a picked reaction, so badging it reads wrong. |
 | `accessibilityLabel` | `"Add another reaction"` | Supply a localized string. |
@@ -181,7 +211,7 @@ Every field is optional, and if nothing resolves the built-in glyph draws — th
 
 | Library | React Native | Nitro | Min Xcode | Min iOS | Min Android |
 | --- | --- | --- | --- | --- | --- |
-| 0.1.x | 0.80 – 0.85 | 0.36.x | 26 | 15 (glass on 26+) | API 24 |
+| 0.1.x – 0.3.x | 0.80 – 0.85 | 0.36.x | 26 | 15 (glass on 26+) | API 24 |
 
 The `react-native-nitro-modules` peer range has a pinned floor **and** ceiling. Nitro is pre-1.0 and ships often; expect releases here when it moves.
 
@@ -194,6 +224,18 @@ Reactions are exposed as buttons with their `accessibilityLabel`. **Reduce Trans
 - Never fade the picker with `opacity` from JavaScript. Setting `opacity: 0` on a glass view **or any ancestor** disables the effect outright.
 - Glass rendering has regressed across iOS point releases before. Re-verify on each iOS minor.
 - Some iOS simulator runtimes cannot render emoji at all — every emoji draws as a missing-glyph box through any API, including plain RN `<Text>`. Observed on iOS 26.3.1, correct on 26.5. Render an emoji through `<Text>` as a control before assuming the library is at fault.
+
+<h2 align="center">☕ Buy me a coffee</h2>
+
+<p align="center">If this library saved you a few hours of fighting UIKit, you can say thanks with a coffee.</p>
+
+<table align="center">
+<tr>
+<td align="center"><a href="https://buycoffee.to/gasacz?coffeeSize=small">☕<br><b>€3</b><br><sub>small</sub></a></td>
+<td align="center"><a href="https://buycoffee.to/gasacz?coffeeSize=medium">☕☕<br><b>€5</b><br><sub>medium</sub></a></td>
+<td align="center"><a href="https://buycoffee.to/gasacz?coffeeSize=large">☕☕☕<br><b>€8</b><br><sub>large</sub></a></td>
+</tr>
+</table>
 
 <img src="assets/license.png" alt="License" width="100%">
 

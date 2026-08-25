@@ -30,6 +30,7 @@ export function toNativeAnotherReaction(
   return {
     symbolIos: appearance.symbol?.ios,
     symbolAndroid: appearance.symbol?.android,
+    symbolColor: appearance.symbol?.color,
     emoji: appearance.emoji,
     badge: appearance.badge,
     accessibilityLabel: appearance.accessibilityLabel,
@@ -70,6 +71,7 @@ export function triggerPayload(content: TriggerContent): NativeTriggerPayload {
       emoji: item.emoji,
       symbolIos: item.symbol?.ios,
       symbolAndroid: item.symbol?.android,
+      symbolColor: item.symbol?.color,
       accessibilityLabel: item.accessibilityLabel,
     })),
     selectedId: content.selected,
@@ -109,6 +111,7 @@ export function isSameTriggerPayload(
   } else if (
     appearanceA.symbolIos !== appearanceB.symbolIos ||
     appearanceA.symbolAndroid !== appearanceB.symbolAndroid ||
+    appearanceA.symbolColor !== appearanceB.symbolColor ||
     appearanceA.emoji !== appearanceB.emoji ||
     appearanceA.badge !== appearanceB.badge ||
     appearanceA.accessibilityLabel !== appearanceB.accessibilityLabel
@@ -125,6 +128,7 @@ export function isSameTriggerPayload(
       itemA.emoji !== itemB.emoji ||
       itemA.symbolIos !== itemB.symbolIos ||
       itemA.symbolAndroid !== itemB.symbolAndroid ||
+      itemA.symbolColor !== itemB.symbolColor ||
       itemA.accessibilityLabel !== itemB.accessibilityLabel
     ) {
       return false;
