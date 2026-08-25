@@ -32,6 +32,9 @@ data class NativeReactionItem(
   val symbolAndroid: String?,
   @DoNotStrip
   @Keep
+  val symbolColor: String?,
+  @DoNotStrip
+  @Keep
   val accessibilityLabel: String
 ) {
   /* primary constructor */
@@ -43,6 +46,7 @@ data class NativeReactionItem(
       && Objects.deepEquals(this.emoji, other.emoji)
       && Objects.deepEquals(this.symbolIos, other.symbolIos)
       && Objects.deepEquals(this.symbolAndroid, other.symbolAndroid)
+      && Objects.deepEquals(this.symbolColor, other.symbolColor)
       && Objects.deepEquals(this.accessibilityLabel, other.accessibilityLabel)
   }
 
@@ -52,6 +56,7 @@ data class NativeReactionItem(
       emoji,
       symbolIos,
       symbolAndroid,
+      symbolColor,
       accessibilityLabel
     ).contentDeepHashCode()
   }
@@ -64,8 +69,8 @@ data class NativeReactionItem(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(id: String, emoji: String, symbolIos: String?, symbolAndroid: String?, accessibilityLabel: String): NativeReactionItem {
-      return NativeReactionItem(id, emoji, symbolIos, symbolAndroid, accessibilityLabel)
+    private fun fromCpp(id: String, emoji: String, symbolIos: String?, symbolAndroid: String?, symbolColor: String?, accessibilityLabel: String): NativeReactionItem {
+      return NativeReactionItem(id, emoji, symbolIos, symbolAndroid, symbolColor, accessibilityLabel)
     }
   }
 }

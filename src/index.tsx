@@ -9,4 +9,5 @@ export type {
   ReactionItem,
   ReactionRenderMode,
   ReactionSymbol,
+  SymbolColorValue,
 } from './types';

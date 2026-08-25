@@ -10,9 +10,44 @@ export type ReactionId = string;
  * Symbol — a different set with different names. Omit `android` to render
  * emoji there.
  */
+/**
+ * What `ReactionSymbol.color` accepts: a hex string, or the keyword
+ * `'multicolor'`.
+ *
+ * The union is written this way so `'multicolor'` autocompletes without the
+ * type collapsing to it — `string & {}` keeps every hex string assignable.
+ */
+export type SymbolColorValue = 'multicolor' | (string & {});
+
 export interface ReactionSymbol {
   readonly ios: string;
   readonly android?: string;
+  /**
+   * Colour for the symbol, as `#RGB`, `#RGBA`, `#RRGGBB` or `#RRGGBBAA` — or
+   * `'multicolor'` for the palette Apple drew into the glyph itself, where the
+   * symbol has one. Which symbols do is Apple's call and varies by OS version:
+   * on iOS 26 `star.fill` comes back gold and `flame.fill` has no palette at
+   * all. A symbol without one renders monochrome as usual rather than falling
+   * back to the emoji — the named glyph is what was asked for, and its palette
+   * was only the preference.
+   *
+   * `'multicolor'` is ignored on `AnotherReactionAppearance`, whose glyph is
+   * composited with its badge into one bitmap that a palette cannot be baked
+   * into safely. Hex colours work there.
+   *
+   * Symbols are monochrome glyphs with no colour of their own, so this is the
+   * only way to give them one — an emoji fallback is unaffected either way,
+   * since it carries its own colour. Anything unparseable is ignored and the
+   * symbol keeps the library's own tint treatment.
+   *
+   * Either way, a coloured symbol keeps its colour whether or not it is the
+   * selected reaction, exactly as an emoji does: selection is drawn as a tint,
+   * and tinting over a supplied colour would throw that colour away. Leave
+   * this unset for the monochrome symbol that tints on selection.
+   *
+   * iOS only in 1.x; Android renders emoji, which have no tint to change.
+   */
+  readonly color?: SymbolColorValue;
 }
 
 export interface ReactionItem {
@@ -50,9 +85,14 @@ export type ReactionRenderMode = 'auto' | 'emoji';
  */
 export interface AnotherReactionAppearance {
   /**
-   * Per-platform symbol name. `android` is accepted but ignored in 1.x, which
-   * renders emoji only — supply `emoji` to customise Android. Ignored
-   * entirely under `renderMode: 'emoji'`, like `ReactionItem.symbol`.
+   * Per-platform symbol name, and optionally its colour. `android` is accepted
+   * but ignored in 1.x, which renders emoji only — supply `emoji` to customise
+   * Android. Ignored entirely under `renderMode: 'emoji'`, like
+   * `ReactionItem.symbol`.
+   *
+   * `color` applies to the whole item, plus badge included — the badge is
+   * drawn into the same image as the glyph, so the two cannot take different
+   * colours or different treatments.
    */
   readonly symbol?: ReactionSymbol;
   /** Used when no symbol renders, and under `renderMode: 'emoji'`. */

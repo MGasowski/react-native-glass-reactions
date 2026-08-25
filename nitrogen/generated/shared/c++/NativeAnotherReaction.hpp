@@ -42,13 +42,14 @@ namespace margelo::nitro::glassreactions {
   public:
     std::optional<std::string> symbolIos     SWIFT_PRIVATE;
     std::optional<std::string> symbolAndroid     SWIFT_PRIVATE;
+    std::optional<std::string> symbolColor     SWIFT_PRIVATE;
     std::optional<std::string> emoji     SWIFT_PRIVATE;
     std::optional<bool> badge     SWIFT_PRIVATE;
     std::optional<std::string> accessibilityLabel     SWIFT_PRIVATE;
 
   public:
     NativeAnotherReaction() = default;
-    explicit NativeAnotherReaction(std::optional<std::string> symbolIos, std::optional<std::string> symbolAndroid, std::optional<std::string> emoji, std::optional<bool> badge, std::optional<std::string> accessibilityLabel): symbolIos(symbolIos), symbolAndroid(symbolAndroid), emoji(emoji), badge(badge), accessibilityLabel(accessibilityLabel) {}
+    explicit NativeAnotherReaction(std::optional<std::string> symbolIos, std::optional<std::string> symbolAndroid, std::optional<std::string> symbolColor, std::optional<std::string> emoji, std::optional<bool> badge, std::optional<std::string> accessibilityLabel): symbolIos(symbolIos), symbolAndroid(symbolAndroid), symbolColor(symbolColor), emoji(emoji), badge(badge), accessibilityLabel(accessibilityLabel) {}
 
   public:
     friend bool operator==(const NativeAnotherReaction& lhs, const NativeAnotherReaction& rhs) = default;
@@ -66,6 +67,7 @@ namespace margelo::nitro {
       return margelo::nitro::glassreactions::NativeAnotherReaction(
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolIos"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolAndroid"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolColor"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "emoji"))),
         JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "badge"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "accessibilityLabel")))
@@ -75,6 +77,7 @@ namespace margelo::nitro {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "symbolIos"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.symbolIos));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "symbolAndroid"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.symbolAndroid));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "symbolColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.symbolColor));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "emoji"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.emoji));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "badge"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.badge));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "accessibilityLabel"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.accessibilityLabel));
@@ -90,6 +93,7 @@ namespace margelo::nitro {
       }
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolIos")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolAndroid")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "symbolColor")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "emoji")))) return false;
       if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "badge")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "accessibilityLabel")))) return false;

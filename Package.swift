@@ -30,7 +30,7 @@ let package = Package(
       path: "ios",
       sources: [
         "PickerInteraction.swift", "ReactionResolution.swift", "PickerLayout.swift",
-        "SlotLayout.swift",
+        "SlotLayout.swift", "SymbolColor.swift",
       ]
     ),
     .testTarget(

@@ -18,7 +18,7 @@ public extension NativeAnotherReaction {
   /**
    * Create a new instance of `NativeAnotherReaction`.
    */
-  init(symbolIos: String?, symbolAndroid: String?, emoji: String?, badge: Bool?, accessibilityLabel: String?) {
+  init(symbolIos: String?, symbolAndroid: String?, symbolColor: String?, emoji: String?, badge: Bool?, accessibilityLabel: String?) {
     self.init({ () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = symbolIos {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
@@ -27,6 +27,12 @@ public extension NativeAnotherReaction {
       }
     }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = symbolAndroid {
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = symbolColor {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
@@ -69,6 +75,18 @@ public extension NativeAnotherReaction {
     return { () -> String? in
       if bridge.has_value_std__optional_std__string_(self.__symbolAndroid) {
         let __unwrapped = bridge.get_std__optional_std__string_(self.__symbolAndroid)
+        return String(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var symbolColor: String? {
+    return { () -> String? in
+      if bridge.has_value_std__optional_std__string_(self.__symbolColor) {
+        let __unwrapped = bridge.get_std__optional_std__string_(self.__symbolColor)
         return String(__unwrapped)
       } else {
         return nil
