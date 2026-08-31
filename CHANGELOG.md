@@ -1,5 +1,11 @@
 # Changelog
 
+# [0.3.0](https://github.com/MGasowski/react-native-glass-reactions/compare/v0.2.1...v0.3.0) (2026-08-31)
+
+### Features
+
+* anchor the picker to the thumb, and flip it when it will not fit ([36887c6](https://github.com/MGasowski/react-native-glass-reactions/commit/36887c6bc96a36c01230ebbc8d40bcfda4c6877c))
+
 ## [0.2.0](https://github.com/MGasowski/react-native-glass-reactions/compare/v0.1.1...v0.2.0) (2026-08-24)
 
 ### Features
