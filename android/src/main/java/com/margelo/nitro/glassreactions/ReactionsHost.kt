@@ -1,6 +1,7 @@
 package com.margelo.nitro.glassreactions
 
 import android.app.Activity
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
@@ -9,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.view.Window
+import android.view.WindowInsets
 import android.widget.FrameLayout
 import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.bridge.LifecycleEventListener
@@ -92,8 +94,20 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
     /** Tolerance around the picker before the selection is cleared. */
     private var focusTolerancePx = 0
 
-    /** Gap between the top of the trigger and the bottom of the picker. */
-    private var verticalGapPx = 0
+    /**
+     * Gap between the touch point and the near edge of the picker when the
+     * picker sits *above* the press. Large enough to clear the fingertip: the
+     * reported touch centre sits well inside the contact patch, and a thumb
+     * extends another 20-30dp past it.
+     */
+    private var gapAbovePx = 0
+
+    /**
+     * The same gap for the flipped case. Smaller on purpose - a picker below
+     * the press is in the hand's shadow whatever the distance, so spending
+     * screen on it buys nothing.
+     */
+    private var gapBelowPx = 0
 
     /** How close the picker may sit to the edge of the screen. */
     private var edgeMarginPx = 0
@@ -242,11 +256,12 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
         // Distinct from `focusTolerancePx`, even though both happened to read
         // 12 before this: one is how far a finger may stray and still count
         // as pointing at a slot, the other is how close the picker may sit to
-        // the screen edge. `verticalGapPx` used to be the same value as
-        // `edgeMarginPx` too — a single `margin` doing both jobs — which put
-        // the pill 4dp further from the trigger on Android than iOS's
-        // matching 8pt/12pt split. See PickerLayout.
-        verticalGapPx = (8 * activity.resources.displayMetrics.density).toInt()
+        // the screen edge. The vertical gaps used to be a single value equal
+        // to `edgeMarginPx` too — one `margin` doing both jobs — which put the
+        // pill 4dp further from the trigger on Android than iOS. All four now
+        // mirror iOS's constants exactly. See PickerLayout.
+        gapAbovePx = (44 * activity.resources.displayMetrics.density).toInt()
+        gapBelowPx = (24 * activity.resources.displayMetrics.density).toInt()
         edgeMarginPx = (12 * activity.resources.displayMetrics.density).toInt()
         originalCallback = window.callback
         wrappedActivity = activity
@@ -358,6 +373,71 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             y >= location[1] && y <= location[1] + view.height
     }
 
+    /**
+     * The region the picker must stay inside, in the overlay's local space.
+     *
+     * Not simply the overlay's bounds: under edge-to-edge the content view
+     * spans the whole display, so bounds alone would let the picker sit under
+     * the status bar or the gesture handle. The window's insets are resolved
+     * in screen space and translated in, then intersected with what the
+     * overlay actually covers — an overlay that is *already* inset (the
+     * classic non-edge-to-edge case) must not be inset a second time.
+     *
+     * Framework `WindowInsets` rather than the androidx compat wrapper:
+     * androidx.core is not a declared dependency of this module, and the
+     * version split below is the whole of what the wrapper would buy.
+     */
+    private fun safeArea(
+        activity: Activity,
+        overlayLocation: IntArray,
+        availableWidth: Int,
+        availableHeight: Int
+    ): PickerFrame {
+        val decor = activity.window?.decorView
+        val insets: WindowInsets? = decor?.rootWindowInsets
+        var insetLeft = 0
+        var insetTop = 0
+        var insetRight = 0
+        var insetBottom = 0
+        if (insets != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val bars = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                )
+                insetLeft = bars.left
+                insetTop = bars.top
+                insetRight = bars.right
+                insetBottom = bars.bottom
+            } else {
+                @Suppress("DEPRECATION")
+                run {
+                    insetLeft = insets.systemWindowInsetLeft
+                    insetTop = insets.systemWindowInsetTop
+                    insetRight = insets.systemWindowInsetRight
+                    insetBottom = insets.systemWindowInsetBottom
+                }
+            }
+        }
+
+        val decorLocation = IntArray(2)
+        decor?.getLocationOnScreen(decorLocation)
+        val decorWidth = decor?.width ?: availableWidth
+        val decorHeight = decor?.height ?: availableHeight
+
+        // Safe rect in screen space, then translated into the overlay's.
+        val left = (decorLocation[0] + insetLeft - overlayLocation[0]).toFloat()
+        val top = (decorLocation[1] + insetTop - overlayLocation[1]).toFloat()
+        val right = (decorLocation[0] + decorWidth - insetRight - overlayLocation[0]).toFloat()
+        val bottom = (decorLocation[1] + decorHeight - insetBottom - overlayLocation[1]).toFloat()
+
+        return PickerFrame(
+            left = left.coerceAtLeast(0f),
+            top = top.coerceAtLeast(0f),
+            right = right.coerceAtMost(availableWidth.toFloat()),
+            bottom = bottom.coerceAtMost(availableHeight.toFloat())
+        )
+    }
+
     private fun openPicker() {
         val (triggerId, triggerView) = pendingTrigger ?: return
         val registration = registrations[triggerId] ?: return
@@ -413,14 +493,32 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             bottom = (location[1] - overlayLocation[1] + triggerView.height).toFloat()
         )
         val localFrame = PickerLayout.frame(
+            // The press, in the same overlay-local space. `downX`/`downY` are
+            // the raw screen coordinates of the touch that started the
+            // long-press — the point the picker is opening in response to,
+            // which is what it must be placed relative to.
+            touch = PickerPoint(
+                x = downX - overlayLocation[0],
+                y = downY - overlayLocation[1]
+            ),
             trigger = triggerLocal,
             pillSize = Size(width.toFloat(), height.toFloat()),
-            containerSize = Size(availableWidth.toFloat(), availableHeight.toFloat()),
-            verticalGap = verticalGapPx.toFloat(),
+            containerBounds = safeArea(
+                activity, overlayLocation, availableWidth, availableHeight
+            ),
+            gapAbove = gapAbovePx.toFloat(),
+            gapBelow = gapBelowPx.toFloat(),
             edgeMargin = edgeMarginPx.toFloat()
         )
         val left = localFrame.left.toInt()
         val top = localFrame.top.toInt()
+
+        // Which side the pill landed on, read back off the frame rather than
+        // returned by the layout: below only when the pill clears the touch
+        // entirely. A pill that straddles the finger — the clamped fallback,
+        // when neither side fits — counts as above and keeps the motion it has
+        // always had.
+        val below = localFrame.top >= downY - overlayLocation[1]
 
         // Explicit LayoutParams rather than a manual layout() call: FrameLayout
         // re-lays its children out on its own pass, and without params the
@@ -429,7 +527,7 @@ class HybridReactionsHost : HybridReactionsHostSpec() {
             leftMargin = left
             topMargin = top
         }
-        pill.prepareForPresentation()
+        pill.prepareForPresentation(growingDownward = below)
         if (pill.parent == null) layer.addView(pill, params) else pill.layoutParams = params
         pill.animateIn()
 

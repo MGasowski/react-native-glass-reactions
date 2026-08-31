@@ -375,8 +375,16 @@ internal class ReactionsPillView(context: android.content.Context) :
         springs.values.forEach { it.cancel() }
     }
 
-    /** Collapsed state, set before the picker is attached. */
-    fun prepareForPresentation() {
+    /**
+     * Collapsed state, set before the picker is attached.
+     *
+     * [growingDownward] is the flipped case: the pill sits *below* the press
+     * because there was no room above it. The expansion has to come out of the
+     * edge nearest the finger either way, so the pivot follows the placement -
+     * a pill below the thumb that grew out of its bottom edge would expand
+     * into the hand.
+     */
+    fun prepareForPresentation(growingDownward: Boolean) {
         // A reopen can land mid-celebration, with animations still in flight
         // and the backdrop faded. Stop everything and restore before collapsing.
         cancelInFlightAnimations()
@@ -397,8 +405,8 @@ internal class ReactionsPillView(context: android.content.Context) :
             }
             return
         }
-        // Grows from the bottom edge, the side nearest the trigger.
-        pivotY = (itemSize + contentInset * 2).toFloat()
+        // Grows from the edge nearest the press.
+        pivotY = if (growingDownward) 0f else (itemSize + contentInset * 2).toFloat()
         scaleX = 0.86f
         scaleY = 0.86f
         translationY = 0f

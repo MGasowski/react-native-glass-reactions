@@ -78,9 +78,10 @@ enum GlassSupport {
 enum SurfaceAppearance {
   /// `rect` is in the coordinate space of `view`'s window, and is the area the
   /// pill will actually occupy — not the trigger's own frame. PickerLayout
-  /// places the pill *above* its trigger, so the trigger's pixels answer the
-  /// wrong question: a dark row sitting under a light page resolved `.dark`
-  /// and put white symbols on white.
+  /// places the pill clear of its trigger (above the press, or below it when
+  /// there is no room), so the trigger's pixels answer the wrong question: a
+  /// dark row sitting under a light page resolved `.dark` and put white
+  /// symbols on white.
   static func isDark(in rect: CGRect, relativeTo view: UIView) -> Bool {
     let fallback = view.traitCollection.userInterfaceStyle == .dark
     guard let window = view.window else { return fallback }
@@ -334,7 +335,13 @@ final class ReactionsPillView: UIView, SlotGeometry {
   }
 
   /// Collapsed state, set before the picker is attached.
-  func prepareForPresentation() {
+  ///
+  /// `growingDownward` is the flipped case: the pill sits *below* the press
+  /// because there was no room above it. The expansion has to come out of the
+  /// edge nearest the finger either way, so the anchor follows the placement —
+  /// a pill below the thumb that grew out of its bottom edge would expand into
+  /// the hand.
+  func prepareForPresentation(growingDownward: Bool) {
     // A long-press arriving mid-collapse reuses this instance. Stopping without
     // finishing also suppresses the old completion, which would otherwise
     // detach the picker that is being reopened.
@@ -347,9 +354,9 @@ final class ReactionsPillView: UIView, SlotGeometry {
     // away and item state scattered. Restore everything before collapsing.
     restoreBackdrop()
 
-    // Grows from the bottom edge, which is the side nearest the trigger, so the
-    // expansion reads as coming out of the row rather than appearing over it.
-    layer.anchorPoint = CGPoint(x: 0.5, y: 1)
+    // Grows from the edge nearest the press, so the expansion reads as coming
+    // out of the row rather than appearing over it.
+    layer.anchorPoint = CGPoint(x: 0.5, y: growingDownward ? 0 : 1)
 
     // The pill's own alpha stays 1 throughout its lifetime. Fading it — or any
     // ancestor of the effect view — renders the glass as a translucent grey

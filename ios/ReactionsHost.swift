@@ -18,8 +18,16 @@ private struct TriggerRegistration {
 }
 
 private enum Layout {
-  /// Gap between the top of the trigger and the bottom of the picker.
-  static let verticalOffset: CGFloat = 8
+  /// Gap between the touch point and the near edge of the picker when the
+  /// picker sits *above* the press. Large enough to clear the fingertip: the
+  /// reported touch centre sits well inside the contact patch, and a thumb
+  /// extends another 20–30pt past it.
+  static let gapAbove: CGFloat = 44
+
+  /// The same gap for the flipped case. Smaller on purpose — a picker below
+  /// the press is in the hand's shadow whatever the distance, so spending
+  /// screen on it buys nothing.
+  static let gapBelow: CGFloat = 24
 
   /// How far outside the picker the finger may stray and still count as
   /// pointing at a reaction. Moving further clears the selection.
@@ -311,19 +319,30 @@ class HybridReactionsHost: HybridReactionsHostSpec {
     // translation before `PickerLayout` can use it.
     let triggerFrame = triggerView.convert(triggerView.bounds, to: nil)
     let pickerFrame = PickerLayout.frame(
+      touch: point,
       trigger: triggerFrame,
       pillSize: picker.intrinsicContentSize,
-      containerSize: overlay.bounds.size,
-      verticalGap: Layout.verticalOffset,
+      // The safe area, not the whole window: `screenMargin` is a cosmetic gap
+      // and was never meant to be measured from underneath the status bar.
+      containerBounds: overlay.bounds.inset(by: overlay.safeAreaInsets),
+      gapAbove: Layout.gapAbove,
+      gapBelow: Layout.gapBelow,
       edgeMargin: Layout.screenMargin
     )
+
+    // Which side the pill landed on, read back off the frame rather than
+    // returned by the layout: below only when the pill clears the touch
+    // entirely. A pill that straddles the finger — the clamped fallback, when
+    // neither side fits — counts as above and keeps the motion it has always
+    // had.
+    let below = pickerFrame.minY >= point.y
 
     // Geometry via bounds and center, never `frame`: prepareForPresentation
     // applies the collapsed scale transform, and assigning `frame` to a
     // transformed view divides the size by the scale — which is exactly the
     // bug where every pill came out ~16% wider than its content, items packed
-    // left with dead space on the right. The center accounts for the (0.5, 1)
-    // anchor prepareForPresentation sets.
+    // left with dead space on the right. The center accounts for the anchor
+    // prepareForPresentation sets.
     // The pill matches the surface it floats over, not the system theme —
     // materials, symbol tints, and the divider all resolve through this trait.
     // Sampled against `pickerFrame`, the area the pill is about to cover.
@@ -331,9 +350,15 @@ class HybridReactionsHost: HybridReactionsHostSpec {
       SurfaceAppearance.isDark(in: pickerFrame, relativeTo: triggerView)
       ? .dark : .light
 
-    picker.prepareForPresentation()
+    picker.prepareForPresentation(growingDownward: below)
     picker.bounds = CGRect(origin: .zero, size: pickerFrame.size)
-    picker.center = CGPoint(x: pickerFrame.midX, y: pickerFrame.maxY)
+    // `center` positions the layer's anchor point, and prepareForPresentation
+    // just put that anchor on the edge nearest the press — so this is that
+    // edge's midpoint, the top one when flipped and the bottom one otherwise.
+    picker.center = CGPoint(
+      x: pickerFrame.midX,
+      y: below ? pickerFrame.minY : pickerFrame.maxY
+    )
     // Attached once and then only hidden/unhidden: re-attaching a glass
     // effect view replays UIKit's frosted "materialize" animation, which is
     // the grey flash on open. A hidden layer is not composited, so the
